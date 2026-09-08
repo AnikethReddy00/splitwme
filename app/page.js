@@ -261,34 +261,16 @@ export default function Home() {
                 )}
               </button>
 
-              {/* 1-Click Quick Demo Login Chips */}
+              {/* 1-Click Quick Demo Login */}
               <div className="pt-4 border-t border-sky-500/15">
-                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-2.5 text-center">
-                  1-Click Demo Accounts
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDemoFill("aniketh@splitwme.com", "password123")}
-                    className="py-2 px-2 rounded-xl text-xs font-medium bg-sky-950/40 hover:bg-sky-500/20 hover:border-sky-400/50 border border-sky-500/20 text-sky-200 transition-all cursor-pointer text-center truncate"
-                  >
-                    Aniketh
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDemoFill("rohan@splitwme.com", "password123")}
-                    className="py-2 px-2 rounded-xl text-xs font-medium bg-sky-950/40 hover:bg-sky-500/20 hover:border-sky-400/50 border border-sky-500/20 text-sky-200 transition-all cursor-pointer text-center truncate"
-                  >
-                    Rohan
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDemoFill("priya@splitwme.com", "password123")}
-                    className="py-2 px-2 rounded-xl text-xs font-medium bg-sky-950/40 hover:bg-sky-500/20 hover:border-sky-400/50 border border-sky-500/20 text-sky-200 transition-all cursor-pointer text-center truncate"
-                  >
-                    Priya
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDemoFill("aniketh@splitwme.com", "password123")}
+                  className="w-full py-2.5 px-3 rounded-xl text-xs font-medium bg-sky-950/40 hover:bg-sky-500/20 hover:border-sky-400/50 border border-sky-500/20 text-sky-200 transition-all cursor-pointer text-center flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Auto-fill Demo: Aniketh Reddy (aniketh@splitwme.com)</span>
+                </button>
               </div>
             </form>
           )}
