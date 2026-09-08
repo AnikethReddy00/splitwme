@@ -31,7 +31,14 @@ import {
   Tag,
   UserPlus,
   MessageCircle,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Settings,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  UserMinus,
+  Check,
+  UserCheck
 } from "lucide-react";
 
 export default function DashboardView() {
@@ -40,20 +47,40 @@ export default function DashboardView() {
   const [selectedGroupId, setSelectedGroupId] = useState("group_1");
 
   // Modals state
-  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState(null); // null if adding new
+
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [isNewGroupOpen, setIsNewGroupOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false);
+
   const [selectedQrSettlement, setSelectedQrSettlement] = useState(null);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [copiedInviteLink, setCopiedInviteLink] = useState(false);
+
+  // Group Settings Edit State
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editGroupCategory, setEditGroupCategory] = useState("Trip");
 
   // Direct Add Friend state inside Invite Modal
   const [directFriendName, setDirectFriendName] = useState("");
   const [directFriendUpi, setDirectFriendUpi] = useState("");
   const [directAddMsg, setDirectAddMsg] = useState("");
 
-  // Base URL for invite links (auto-detects localhost vs deployed Vercel URL)
+  // Expense form state
+  const [expenseTitle, setExpenseTitle] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expensePaidBy, setExpensePaidBy] = useState(user?.name || "Aniketh Reddy");
+  const [expenseCategory, setExpenseCategory] = useState("Food");
+  const [expenseSplitBetween, setExpenseSplitBetween] = useState([]);
+
+  // New Group form state
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupCategory, setNewGroupCategory] = useState("Trip");
+  const [newGroupMembersText, setNewGroupMembersText] = useState("");
+
+  // Base URL for invite links
   const [originUrl, setOriginUrl] = useState("");
 
   useEffect(() => {
@@ -78,26 +105,28 @@ export default function DashboardView() {
     fetchGroups();
   }, []);
 
-  // New Expense form state
-  const [expenseTitle, setExpenseTitle] = useState("");
-  const [expenseAmount, setExpenseAmount] = useState("");
-  const [expensePaidBy, setExpensePaidBy] = useState(user?.name || "Aniketh Reddy");
-  const [expenseCategory, setExpenseCategory] = useState("Food");
-  const [expenseSplitBetween, setExpenseSplitBetween] = useState([]);
-
-  // New Group form state
-  const [newGroupName, setNewGroupName] = useState("");
-  const [newGroupCategory, setNewGroupCategory] = useState("Trip");
-  const [newGroupMembersText, setNewGroupMembersText] = useState("");
-
   const selectedGroup = useMemo(() => {
-    return groups.find((g) => g.id === selectedGroupId) || groups[0];
+    return groups.find((g) => g.id === selectedGroupId) || groups[0] || {
+      id: "fallback",
+      name: "My Group",
+      category: "Trip",
+      members: [user?.name || "Aniketh Reddy"],
+      expenses: []
+    };
   }, [groups, selectedGroupId]);
+
+  // Sync Group Settings Modal when opening
+  useEffect(() => {
+    if (selectedGroup) {
+      setEditGroupName(selectedGroup.name);
+      setEditGroupCategory(selectedGroup.category || "Trip");
+    }
+  }, [selectedGroup]);
 
   // Calculate Smart Settlements for the currently selected group
   const { netBalances, settlements } = useMemo(() => {
     if (!selectedGroup) return { netBalances: {}, settlements: [] };
-    return calculateSmartSettlements(selectedGroup.members, selectedGroup.expenses);
+    return calculateSmartSettlements(selectedGroup.members || [], selectedGroup.expenses || []);
   }, [selectedGroup]);
 
   // Calculate Overall Net Balance for the logged-in user across all groups
@@ -107,7 +136,7 @@ export default function DashboardView() {
     let totalExpensesSum = 0;
 
     groups.forEach((grp) => {
-      const { netBalances: grpBalances } = calculateSmartSettlements(grp.members, grp.expenses);
+      const { netBalances: grpBalances } = calculateSmartSettlements(grp.members || [], grp.expenses || []);
       const userNet = grpBalances[user?.name] || 0;
       if (userNet > 0) totalOwedToUser += userNet;
       if (userNet < 0) totalUserOwes += Math.abs(userNet);
@@ -126,8 +155,34 @@ export default function DashboardView() {
     };
   }, [groups, user?.name]);
 
-  // Handle Adding a New Expense
-  const handleAddExpenseSubmit = (e) => {
+  // Open Expense Modal for Creating
+  const handleOpenAddExpense = () => {
+    setEditingExpenseId(null);
+    setExpenseTitle("");
+    setExpenseAmount("");
+    setExpensePaidBy(user?.name || selectedGroup.members[0] || "Aniketh Reddy");
+    setExpenseCategory("Food");
+    setExpenseSplitBetween(selectedGroup.members || []);
+    setIsExpenseModalOpen(true);
+  };
+
+  // Open Expense Modal for Editing
+  const handleOpenEditExpense = (expense) => {
+    setEditingExpenseId(expense.id);
+    setExpenseTitle(expense.title);
+    setExpenseAmount(String(expense.amount));
+    setExpensePaidBy(expense.paidBy);
+    setExpenseCategory(expense.category || "Food");
+    setExpenseSplitBetween(
+      expense.splitBetween && expense.splitBetween.length > 0 
+        ? [...expense.splitBetween] 
+        : [...selectedGroup.members]
+    );
+    setIsExpenseModalOpen(true);
+  };
+
+  // Handle Save Expense (Add or Edit)
+  const handleSaveExpense = async (e) => {
     e.preventDefault();
     if (!expenseTitle || !expenseAmount || Number(expenseAmount) <= 0) return;
 
@@ -135,33 +190,187 @@ export default function DashboardView() {
       ? expenseSplitBetween 
       : selectedGroup.members;
 
-    const newExpense = {
-      id: `e_${Date.now()}`,
-      title: expenseTitle.trim(),
-      amount: Number(expenseAmount),
-      paidBy: expensePaidBy,
-      splitBetween: splitMembers,
-      date: "Just now",
-      category: expenseCategory
-    };
+    if (editingExpenseId) {
+      // Edit existing expense
+      const updatedExpenseData = {
+        title: expenseTitle.trim(),
+        amount: Number(expenseAmount),
+        paidBy: expensePaidBy,
+        category: expenseCategory,
+        splitBetween: splitMembers
+      };
+
+      try {
+        await fetch(`/api/groups/${selectedGroup.id}/expenses/${editingExpenseId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedExpenseData)
+        });
+      } catch (err) {
+        console.error("API update expense error:", err);
+      }
+
+      setGroups((prev) =>
+        prev.map((g) => {
+          if (g.id === selectedGroup.id) {
+            return {
+              ...g,
+              expenses: (g.expenses || []).map((exp) =>
+                exp.id === editingExpenseId ? { ...exp, ...updatedExpenseData } : exp
+              )
+            };
+          }
+          return g;
+        })
+      );
+    } else {
+      // Add new expense
+      const newExpense = {
+        id: `e_${Date.now()}`,
+        title: expenseTitle.trim(),
+        amount: Number(expenseAmount),
+        paidBy: expensePaidBy,
+        splitBetween: splitMembers,
+        date: "Just now",
+        category: expenseCategory
+      };
+
+      try {
+        await fetch(`/api/groups/${selectedGroup.id}`, {
+          method: "POST"
+        });
+      } catch (err) {
+        // Fallback
+      }
+
+      setGroups((prev) =>
+        prev.map((g) => {
+          if (g.id === selectedGroup.id) {
+            return {
+              ...g,
+              expenses: [newExpense, ...(g.expenses || [])]
+            };
+          }
+          return g;
+        })
+      );
+    }
+
+    setIsExpenseModalOpen(false);
+  };
+
+  // Handle Delete Expense
+  const handleDeleteExpense = async (expenseId, title) => {
+    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+
+    try {
+      await fetch(`/api/groups/${selectedGroup.id}/expenses/${expenseId}`, {
+        method: "DELETE"
+      });
+    } catch (err) {
+      console.error("Delete expense error:", err);
+    }
 
     setGroups((prev) =>
       prev.map((g) => {
         if (g.id === selectedGroup.id) {
           return {
             ...g,
-            expenses: [newExpense, ...(g.expenses || [])]
+            expenses: (g.expenses || []).filter((e) => e.id !== expenseId)
+          };
+        }
+        return g;
+      })
+    );
+  };
+
+  // Handle Save Group Settings (Rename / Change Category)
+  const handleSaveGroupSettings = async (e) => {
+    e.preventDefault();
+    if (!editGroupName.trim()) return;
+
+    try {
+      await fetch(`/api/groups/${selectedGroup.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editGroupName.trim(),
+          category: editGroupCategory
+        })
+      });
+    } catch (err) {
+      console.error("Update group API error:", err);
+    }
+
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id === selectedGroup.id) {
+          return {
+            ...g,
+            name: editGroupName.trim(),
+            category: editGroupCategory
           };
         }
         return g;
       })
     );
 
-    // Reset and close
-    setExpenseTitle("");
-    setExpenseAmount("");
-    setExpenseSplitBetween([]);
-    setIsAddExpenseOpen(false);
+    setIsGroupSettingsOpen(false);
+  };
+
+  // Handle Remove Member from Group
+  const handleRemoveMember = async (memberName) => {
+    if (memberName === user?.name) {
+      alert("You cannot remove yourself as group admin.");
+      return;
+    }
+    if (!confirm(`Remove ${memberName} from "${selectedGroup.name}"?`)) return;
+
+    try {
+      await fetch(`/api/groups/${selectedGroup.id}/members/${encodeURIComponent(memberName)}`, {
+        method: "DELETE"
+      });
+    } catch (err) {
+      console.error("Remove member API error:", err);
+    }
+
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id === selectedGroup.id) {
+          const updatedMembers = g.members.filter((m) => m !== memberName);
+          const updatedExpenses = (g.expenses || []).map((exp) => ({
+            ...exp,
+            splitBetween: exp.splitBetween?.filter((m) => m !== memberName) || updatedMembers
+          }));
+          return {
+            ...g,
+            members: updatedMembers,
+            expenses: updatedExpenses
+          };
+        }
+        return g;
+      })
+    );
+  };
+
+  // Handle Delete Group
+  const handleDeleteGroup = async () => {
+    if (!confirm(`Are you sure you want to delete the group "${selectedGroup.name}"? This action cannot be undone.`)) return;
+
+    try {
+      await fetch(`/api/groups/${selectedGroup.id}`, {
+        method: "DELETE"
+      });
+    } catch (err) {
+      console.error("Delete group error:", err);
+    }
+
+    const remainingGroups = groups.filter((g) => g.id !== selectedGroup.id);
+    setGroups(remainingGroups);
+    if (remainingGroups.length > 0) {
+      setSelectedGroupId(remainingGroups[0].id);
+    }
+    setIsGroupSettingsOpen(false);
   };
 
   // Handle Creating a New Group
@@ -456,7 +665,7 @@ export default function DashboardView() {
                 />
                 <span className="font-semibold">{group.name}</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-slate-400 font-mono">
-                  {group.members.length} members
+                  {group.members?.length || 0} members
                 </span>
               </button>
             );
@@ -475,9 +684,18 @@ export default function DashboardView() {
                     <Tag className="w-3 h-3" />
                     {selectedGroup.category || "Expense Group"}
                   </div>
-                  <h2 className="text-2xl font-black text-white">{selectedGroup.name}</h2>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-2xl font-black text-white">{selectedGroup.name}</h2>
+                    <button
+                      onClick={() => setIsGroupSettingsOpen(true)}
+                      title="Group Settings & Members"
+                      className="p-1.5 rounded-xl glass-panel-subtle hover:text-sky-300 text-slate-400 hover:border-sky-500/30 transition-colors cursor-pointer"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                  </div>
                   <p className="text-xs text-slate-400 mt-1">
-                    {selectedGroup.members.join(", ")}
+                    {selectedGroup.members?.join(", ") || "No members"}
                   </p>
                 </div>
 
@@ -488,15 +706,11 @@ export default function DashboardView() {
                     className="py-2.5 px-3.5 rounded-xl text-xs font-semibold text-teal-300 glass-panel-subtle hover:bg-teal-500/20 border border-teal-500/30 flex items-center gap-1.5 cursor-pointer transition-all"
                   >
                     <UserPlus className="w-4 h-4 text-teal-400" />
-                    <span>Invite Friends</span>
+                    <span>Invite</span>
                   </button>
 
                   <button
-                    onClick={() => {
-                      setExpensePaidBy(user?.name || selectedGroup.members[0]);
-                      setExpenseSplitBetween(selectedGroup.members);
-                      setIsAddExpenseOpen(true);
-                    }}
+                    onClick={handleOpenAddExpense}
                     className="py-2.5 px-4 rounded-xl text-xs font-semibold text-white btn-glow-primary flex items-center gap-1.5 cursor-pointer shadow-lg"
                   >
                     <Plus className="w-4 h-4" />
@@ -556,43 +770,67 @@ export default function DashboardView() {
               ) : (
                 <div className="space-y-3">
                   {selectedGroup.expenses.map((expense) => {
-                    const isPayer = expense.paidBy === user?.name;
+                    const splitCount = expense.splitBetween?.length || selectedGroup.members.length;
+                    const perPersonAmount = (Number(expense.amount) / splitCount).toFixed(0);
+
                     return (
                       <div
                         key={expense.id}
-                        className="glass-panel-subtle glass-panel-hover p-4 rounded-2xl flex items-center justify-between gap-3"
+                        className="glass-panel-subtle glass-panel-hover p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
                       >
                         <div className="flex items-center gap-3.5">
                           <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center shrink-0">
                             <Receipt className="w-5 h-5 text-sky-400" />
                           </div>
                           <div>
-                            <div className="text-sm font-bold text-white">{expense.title}</div>
-                            <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                            <div className="text-sm font-bold text-white flex items-center gap-2">
+                              <span>{expense.title}</span>
+                              <span className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] text-slate-400 font-normal">
+                                {expense.category}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-400 flex flex-wrap items-center gap-1.5 mt-0.5">
                               <span className="text-sky-300 font-medium">
                                 Paid by {expense.paidBy}
                               </span>
                               <span>•</span>
                               <span>{expense.date || "Today"}</span>
                               <span>•</span>
-                              <span className="px-1.5 py-0.5 rounded bg-white/5 text-[10px]">
-                                {expense.category}
+                              <span className="text-teal-400 font-mono text-[11px]">
+                                Split by {splitCount} ({expense.splitBetween?.join(", ") || "All members"})
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="text-right shrink-0">
-                          <div className="text-sm font-bold text-white">
-                            ₹{Number(expense.amount).toLocaleString()}
+                        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                          <div className="text-left sm:text-right">
+                            <div className="text-sm font-black text-white">
+                              ₹{Number(expense.amount).toLocaleString()}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                              ₹{perPersonAmount}/ea
+                            </div>
                           </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            {expense.splitBetween?.length || selectedGroup.members.length} people split (₹
-                            {(
-                              Number(expense.amount) /
-                              (expense.splitBetween?.length || selectedGroup.members.length)
-                            ).toFixed(0)}
-                            /ea)
+
+                          {/* Actions: Edit & Delete */}
+                          <div className="flex items-center gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditExpense(expense)}
+                              title="Edit Expense"
+                              className="p-1.5 rounded-lg glass-panel-subtle hover:text-sky-300 text-slate-400 hover:border-sky-500/30 transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteExpense(expense.id, expense.title)}
+                              title="Delete Expense"
+                              className="p-1.5 rounded-lg glass-panel-subtle hover:text-rose-400 text-slate-400 hover:border-rose-500/30 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -716,6 +954,320 @@ export default function DashboardView() {
         </div>
       </main>
 
+      {/* MODAL: GROUP SETTINGS & MEMBER MANAGEMENT */}
+      {isGroupSettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+          <div className="glass-panel w-full max-w-lg rounded-3xl p-6 sm:p-7 relative border border-sky-500/30 space-y-5">
+            <button
+              onClick={() => setIsGroupSettingsOpen(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 rounded-2xl bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                <Settings className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Group Settings</h3>
+                <p className="text-xs text-slate-400">Manage group details, members, and rules</p>
+              </div>
+            </div>
+
+            {/* Rename & Category Form */}
+            <form onSubmit={handleSaveGroupSettings} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Group Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editGroupName}
+                  onChange={(e) => setEditGroupName(e.target.value)}
+                  className="glass-input w-full px-3.5 py-2 rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Category</label>
+                <select
+                  value={editGroupCategory}
+                  onChange={(e) => setEditGroupCategory(e.target.value)}
+                  className="glass-input w-full px-3 py-2 rounded-xl text-sm bg-slate-900"
+                >
+                  <option value="Trip">🌴 Vacation / Trip</option>
+                  <option value="Home">🏠 Apartment / Flatmates</option>
+                  <option value="Dinner">🍕 Dinner & Outing</option>
+                  <option value="Project">💻 Project / Event</option>
+                  <option value="General">🏷️ General</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 px-4 rounded-xl font-semibold text-white btn-glow-primary text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>Save Group Changes</span>
+              </button>
+            </form>
+
+            {/* Member Management Section */}
+            <div className="pt-4 border-t border-white/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                  Group Members ({selectedGroup.members?.length || 0})
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsGroupSettingsOpen(false);
+                    setIsInviteModalOpen(true);
+                  }}
+                  className="text-xs text-teal-400 hover:text-teal-300 font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>+ Invite Member</span>
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                {selectedGroup.members?.map((member) => {
+                  const details = selectedGroup.memberDetails?.[member] || {};
+                  const isCurrentUser = member === user?.name;
+
+                  return (
+                    <div
+                      key={member}
+                      className="glass-panel-subtle p-2.5 rounded-xl flex items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-sky-900/60 flex items-center justify-center text-sky-200 font-bold text-xs">
+                          {member[0]}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-white flex items-center gap-1">
+                            <span>{member}</span>
+                            {isCurrentUser && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-sky-400/80 font-mono">
+                            {details.upiId || "UPI not set"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {!isCurrentUser && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(member)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                          title={`Remove ${member}`}
+                        >
+                          <UserMinus className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Danger Zone: Delete Group */}
+            <div className="pt-4 border-t border-rose-500/20">
+              <button
+                type="button"
+                onClick={handleDeleteGroup}
+                className="w-full py-2.5 px-4 rounded-xl font-medium text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Entire Group</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD / EDIT EXPENSE WITH GRANULAR SUBSET SPLITTING */}
+      {isExpenseModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div className="glass-panel w-full max-w-md rounded-3xl p-6 sm:p-7 relative border border-sky-500/30 max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setIsExpenseModalOpen(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-4">
+              {editingExpenseId ? (
+                <>
+                  <Pencil className="w-5 h-5 text-sky-400" />
+                  Edit Group Expense
+                </>
+              ) : (
+                <>
+                  <Plus className="w-5 h-5 text-sky-400" />
+                  Add Group Expense
+                </>
+              )}
+            </h3>
+
+            <form onSubmit={handleSaveExpense} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Expense Description
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={expenseTitle}
+                  onChange={(e) => setExpenseTitle(e.target.value)}
+                  placeholder="e.g. Scuba Diving, Dinner, Petrol, Groceries"
+                  className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm placeholder:text-slate-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Total Amount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    required
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                    placeholder="1200"
+                    className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Category</label>
+                  <select
+                    value={expenseCategory}
+                    onChange={(e) => setExpenseCategory(e.target.value)}
+                    className="glass-input w-full px-3 py-2.5 rounded-xl text-sm bg-slate-900"
+                  >
+                    <option value="Food">🍽️ Food & Drinks</option>
+                    <option value="Stay">🏨 Hotel / Stay</option>
+                    <option value="Transport">🚗 Travel & Cabs</option>
+                    <option value="Groceries">🛒 Groceries</option>
+                    <option value="Activities">🎟️ Fun & Activities</option>
+                    <option value="Utilities">💡 Utilities / Bills</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Who Paid the Bill?
+                </label>
+                <select
+                  value={expensePaidBy}
+                  onChange={(e) => setExpensePaidBy(e.target.value)}
+                  className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-900"
+                >
+                  {selectedGroup.members?.map((m) => (
+                    <option key={m} value={m}>
+                      {m} {m === user?.name ? "(You)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* GRANULAR SUBSET SPLITTING SELECTOR */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-medium text-slate-300">
+                    Split With Specific People ({expenseSplitBetween.length} of {selectedGroup.members?.length || 0})
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExpenseSplitBetween([...selectedGroup.members])}
+                      className="text-[11px] text-sky-400 hover:text-sky-300 font-semibold cursor-pointer"
+                    >
+                      All
+                    </button>
+                    <span className="text-slate-600">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setExpenseSplitBetween([])}
+                      className="text-[11px] text-slate-400 hover:text-slate-300 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                {/* Per person live calculation preview */}
+                {expenseAmount > 0 && expenseSplitBetween.length > 0 && (
+                  <div className="mb-2 p-2 rounded-xl bg-teal-500/10 border border-teal-500/20 text-xs text-teal-300 flex items-center justify-between font-mono">
+                    <span>Per person share:</span>
+                    <span className="font-bold">
+                      ₹{(Number(expenseAmount) / expenseSplitBetween.length).toFixed(2)} / person
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
+                  {selectedGroup.members?.map((m) => {
+                    const isChecked = expenseSplitBetween.includes(m);
+                    return (
+                      <label
+                        key={m}
+                        className={`flex items-center gap-2 text-xs p-2 rounded-lg cursor-pointer transition-colors ${
+                          isChecked
+                            ? "bg-sky-500/15 border border-sky-500/30 text-white font-medium"
+                            : "text-slate-400 hover:bg-white/5 border border-transparent"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            let current = [...expenseSplitBetween];
+                            if (e.target.checked) {
+                              if (!current.includes(m)) current.push(m);
+                            } else {
+                              current = current.filter((x) => x !== m);
+                            }
+                            setExpenseSplitBetween(current);
+                          }}
+                          className="rounded border-sky-500/30 text-sky-500 focus:ring-sky-500"
+                        />
+                        <span className="truncate">{m}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {expenseSplitBetween.length === 0 && (
+                  <p className="text-[11px] text-amber-400 mt-1">
+                    ⚠️ Please select at least one person to split this expense.
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={expenseSplitBetween.length === 0}
+                className="w-full py-3 px-4 rounded-xl font-semibold text-white btn-glow-primary flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:opacity-50"
+              >
+                <span>{editingExpenseId ? "Save Changes" : "Log Expense & Split"}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: INVITE FRIENDS / SHARE GROUP LINK */}
       {isInviteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
@@ -827,10 +1379,10 @@ export default function DashboardView() {
             {/* Existing Members Chips */}
             <div className="mt-4 pt-3 border-t border-white/5">
               <div className="text-[11px] text-slate-400 mb-2">
-                Current Members ({selectedGroup.members.length}):
+                Current Members ({selectedGroup.members?.length || 0}):
               </div>
               <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                {selectedGroup.members.map((m) => (
+                {selectedGroup.members?.map((m) => (
                   <span
                     key={m}
                     className="px-2.5 py-1 rounded-xl text-xs bg-slate-900 border border-sky-500/15 text-slate-300 flex items-center gap-1.5"
@@ -845,141 +1397,7 @@ export default function DashboardView() {
         </div>
       )}
 
-      {/* MODAL 1: ADD EXPENSE */}
-      {isAddExpenseOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="glass-panel w-full max-w-md rounded-3xl p-6 sm:p-7 relative border border-sky-500/30">
-            <button
-              onClick={() => setIsAddExpenseOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-4">
-              <Plus className="w-5 h-5 text-sky-400" />
-              Add Group Expense
-            </h3>
-
-            <form onSubmit={handleAddExpenseSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Expense Description
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={expenseTitle}
-                  onChange={(e) => setExpenseTitle(e.target.value)}
-                  placeholder="e.g. Dinner at Fisherman's Wharf, Uber to Airport"
-                  className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm placeholder:text-slate-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Amount (₹)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="1"
-                    required
-                    value={expenseAmount}
-                    onChange={(e) => setExpenseAmount(e.target.value)}
-                    placeholder="1200"
-                    className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Category</label>
-                  <select
-                    value={expenseCategory}
-                    onChange={(e) => setExpenseCategory(e.target.value)}
-                    className="glass-input w-full px-3 py-2.5 rounded-xl text-sm bg-slate-900"
-                  >
-                    <option value="Food">🍽️ Food & Drinks</option>
-                    <option value="Stay">🏨 Hotel / Stay</option>
-                    <option value="Transport">🚗 Travel & Cabs</option>
-                    <option value="Groceries">🛒 Groceries</option>
-                    <option value="Activities">🎟️ Fun & Activities</option>
-                    <option value="Utilities">💡 Utilities / Bills</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Who Paid the Bill?
-                </label>
-                <select
-                  value={expensePaidBy}
-                  onChange={(e) => setExpensePaidBy(e.target.value)}
-                  className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-900"
-                >
-                  {selectedGroup.members.map((m) => (
-                    <option key={m} value={m}>
-                      {m} {m === user?.name ? "(You)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-medium text-slate-300">
-                    Split Between ({expenseSplitBetween.length || selectedGroup.members.length} members)
-                  </label>
-                  {expenseAmount > 0 && (
-                    <span className="text-xs text-sky-400 font-mono">
-                      ₹{(Number(expenseAmount) / (expenseSplitBetween.length || selectedGroup.members.length)).toFixed(2)}/person
-                    </span>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
-                  {selectedGroup.members.map((m) => {
-                    const isChecked = expenseSplitBetween.length === 0 || expenseSplitBetween.includes(m);
-                    return (
-                      <label
-                        key={m}
-                        className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer p-1.5 rounded-lg hover:bg-white/5"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            let current = expenseSplitBetween.length === 0 ? [...selectedGroup.members] : [...expenseSplitBetween];
-                            if (e.target.checked) {
-                              if (!current.includes(m)) current.push(m);
-                            } else {
-                              current = current.filter((x) => x !== m);
-                            }
-                            setExpenseSplitBetween(current);
-                          }}
-                          className="rounded border-sky-500/30 text-sky-500 focus:ring-sky-500"
-                        />
-                        <span className="truncate">{m}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 px-4 rounded-xl font-semibold text-white btn-glow-primary flex items-center justify-center gap-2 mt-2 cursor-pointer"
-              >
-                <span>Log Expense & Update Splits</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: QR CODE SCANNER */}
+      {/* MODAL: QR CODE SCANNER */}
       {selectedQrSettlement && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
           <div className="glass-panel w-full max-w-sm rounded-3xl p-6 sm:p-7 relative border border-sky-500/30 text-center">
@@ -1038,7 +1456,7 @@ export default function DashboardView() {
         </div>
       )}
 
-      {/* MODAL 3: CREATE NEW GROUP */}
+      {/* MODAL: CREATE NEW GROUP */}
       {isNewGroupOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
           <div className="glass-panel w-full max-w-md rounded-3xl p-6 sm:p-7 relative border border-sky-500/30">
