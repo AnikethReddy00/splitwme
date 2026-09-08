@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   INITIAL_GROUPS,
@@ -28,7 +28,10 @@ import {
   ExternalLink,
   Copy,
   ChevronRight,
-  Tag
+  Tag,
+  UserPlus,
+  MessageCircle,
+  Link as LinkIcon
 } from "lucide-react";
 
 export default function DashboardView() {
@@ -40,8 +43,40 @@ export default function DashboardView() {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [isNewGroupOpen, setIsNewGroupOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [selectedQrSettlement, setSelectedQrSettlement] = useState(null);
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [copiedInviteLink, setCopiedInviteLink] = useState(false);
+
+  // Direct Add Friend state inside Invite Modal
+  const [directFriendName, setDirectFriendName] = useState("");
+  const [directFriendUpi, setDirectFriendUpi] = useState("");
+  const [directAddMsg, setDirectAddMsg] = useState("");
+
+  // Base URL for invite links (auto-detects localhost vs deployed Vercel URL)
+  const [originUrl, setOriginUrl] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOriginUrl(window.location.origin);
+    }
+  }, []);
+
+  // Sync groups from API on load
+  useEffect(() => {
+    async function fetchGroups() {
+      try {
+        const res = await fetch("/api/groups");
+        const data = await res.json();
+        if (res.ok && data.groups && data.groups.length > 0) {
+          setGroups(data.groups);
+        }
+      } catch (err) {
+        console.error("Failed to load groups:", err);
+      }
+    }
+    fetchGroups();
+  }, []);
 
   // New Expense form state
   const [expenseTitle, setExpenseTitle] = useState("");
@@ -77,7 +112,7 @@ export default function DashboardView() {
       if (userNet > 0) totalOwedToUser += userNet;
       if (userNet < 0) totalUserOwes += Math.abs(userNet);
 
-      grp.expenses.forEach((e) => {
+      grp.expenses?.forEach((e) => {
         totalExpensesSum += Number(e.amount) || 0;
       });
     });
@@ -115,7 +150,7 @@ export default function DashboardView() {
         if (g.id === selectedGroup.id) {
           return {
             ...g,
-            expenses: [newExpense, ...g.expenses]
+            expenses: [newExpense, ...(g.expenses || [])]
           };
         }
         return g;
@@ -130,7 +165,7 @@ export default function DashboardView() {
   };
 
   // Handle Creating a New Group
-  const handleCreateGroup = (e) => {
+  const handleCreateGroup = async (e) => {
     e.preventDefault();
     if (!newGroupName.trim()) return;
 
@@ -142,7 +177,7 @@ export default function DashboardView() {
     const allMembers = Array.from(new Set([user?.name || "Aniketh Reddy", ...extraMembers]));
 
     const newGroup = {
-      id: `group_${Date.now()}`,
+      id: `grp_${Date.now()}`,
       name: newGroupName.trim(),
       category: newGroupCategory,
       members: allMembers,
@@ -155,11 +190,90 @@ export default function DashboardView() {
       expenses: []
     };
 
+    try {
+      await fetch("/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newGroupName.trim(),
+          category: newGroupCategory,
+          creatorName: user?.name,
+          creatorUpi: user?.upiId,
+          members: extraMembers
+        })
+      });
+    } catch (err) {
+      console.error("API create group error:", err);
+    }
+
     setGroups((prev) => [newGroup, ...prev]);
     setSelectedGroupId(newGroup.id);
     setNewGroupName("");
     setNewGroupMembersText("");
     setIsNewGroupOpen(false);
+  };
+
+  // Handle Direct Adding a Friend to the Group
+  const handleDirectAddFriend = async (e) => {
+    e.preventDefault();
+    if (!directFriendName.trim()) return;
+
+    const cleanName = directFriendName.trim();
+    const cleanUpi = directFriendUpi.trim() || `${cleanName.toLowerCase().replace(/\s+/g, "")}@upi`;
+
+    try {
+      await fetch(`/api/groups/${selectedGroup.id}/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: cleanName,
+          upiId: cleanUpi
+        })
+      });
+    } catch (err) {
+      console.error("Join api error:", err);
+    }
+
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id === selectedGroup.id) {
+          const updatedMembers = g.members.includes(cleanName) ? g.members : [...g.members, cleanName];
+          return {
+            ...g,
+            members: updatedMembers,
+            memberDetails: {
+              ...(g.memberDetails || {}),
+              [cleanName]: {
+                upiId: cleanUpi,
+                avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(cleanName)}`
+              }
+            }
+          };
+        }
+        return g;
+      })
+    );
+
+    setDirectFriendName("");
+    setDirectFriendUpi("");
+    setDirectAddMsg(`Added ${cleanName} to ${selectedGroup.name}!`);
+    setTimeout(() => setDirectAddMsg(""), 3500);
+  };
+
+  // Generate Invite URL
+  const inviteUrl = `${originUrl || "http://localhost:3000"}/join/${selectedGroup.id}`;
+
+  const handleCopyInviteLink = () => {
+    navigator.clipboard.writeText(inviteUrl);
+    setCopiedInviteLink(true);
+    setTimeout(() => setCopiedInviteLink(false), 3000);
+  };
+
+  const handleWhatsAppShare = () => {
+    const text = encodeURIComponent(
+      `Hey! Join our "${selectedGroup.name}" group on SplitWMe to track shared expenses & settle up in 1-click via UPI:\n👉 ${inviteUrl}`
+    );
+    window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
   };
 
   // Handle Copy Settlement Link
@@ -367,7 +481,16 @@ export default function DashboardView() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* INVITE FRIENDS BUTTON */}
+                  <button
+                    onClick={() => setIsInviteModalOpen(true)}
+                    className="py-2.5 px-3.5 rounded-xl text-xs font-semibold text-teal-300 glass-panel-subtle hover:bg-teal-500/20 border border-teal-500/30 flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <UserPlus className="w-4 h-4 text-teal-400" />
+                    <span>Invite Friends</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       setExpensePaidBy(user?.name || selectedGroup.members[0]);
@@ -385,7 +508,7 @@ export default function DashboardView() {
                     className="py-2.5 px-3.5 rounded-xl text-xs font-semibold text-sky-300 glass-panel-subtle hover:bg-sky-500/20 border border-sky-500/30 flex items-center gap-1.5 cursor-pointer transition-all"
                   >
                     <Zap className="w-4 h-4 text-sky-400" />
-                    <span>Settle Dues</span>
+                    <span>Settle</span>
                   </button>
                 </div>
               </div>
@@ -397,8 +520,8 @@ export default function DashboardView() {
                   <span className="font-bold text-white">
                     ₹
                     {selectedGroup.expenses
-                      .reduce((sum, e) => sum + Number(e.amount), 0)
-                      .toLocaleString()}
+                      ?.reduce((sum, e) => sum + Number(e.amount), 0)
+                      .toLocaleString() || 0}
                   </span>
                 </div>
                 <div>
@@ -420,13 +543,13 @@ export default function DashboardView() {
                 <div className="flex items-center gap-2">
                   <Receipt className="w-4 h-4 text-sky-400" />
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                    Logged Transactions ({selectedGroup.expenses.length})
+                    Logged Transactions ({selectedGroup.expenses?.length || 0})
                   </h3>
                 </div>
                 <span className="text-xs text-slate-400 font-mono">Real-time split</span>
               </div>
 
-              {selectedGroup.expenses.length === 0 ? (
+              {(!selectedGroup.expenses || selectedGroup.expenses.length === 0) ? (
                 <div className="text-center py-10 text-slate-500 text-xs">
                   No expenses logged yet in this group. Click "+ Add Expense" to start!
                 </div>
@@ -464,8 +587,12 @@ export default function DashboardView() {
                             ₹{Number(expense.amount).toLocaleString()}
                           </div>
                           <div className="text-[11px] text-slate-400 mt-0.5">
-                            {expense.splitBetween.length} people split (₹
-                            {(Number(expense.amount) / expense.splitBetween.length).toFixed(0)}/ea)
+                            {expense.splitBetween?.length || selectedGroup.members.length} people split (₹
+                            {(
+                              Number(expense.amount) /
+                              (expense.splitBetween?.length || selectedGroup.members.length)
+                            ).toFixed(0)}
+                            /ea)
                           </div>
                         </div>
                       </div>
@@ -588,6 +715,135 @@ export default function DashboardView() {
           </div>
         </div>
       </main>
+
+      {/* MODAL: INVITE FRIENDS / SHARE GROUP LINK */}
+      {isInviteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div className="glass-panel w-full max-w-lg rounded-3xl p-6 sm:p-7 relative border border-teal-500/30">
+            <button
+              onClick={() => setIsInviteModalOpen(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="p-2.5 rounded-2xl bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                <UserPlus className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Invite Friends</h3>
+                <p className="text-xs text-slate-400">
+                  Share invite link to <span className="text-sky-300 font-semibold">{selectedGroup.name}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Share Link Box */}
+            <div className="mt-5 p-4 rounded-2xl bg-slate-900/80 border border-sky-500/20 space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-300 font-medium">
+                <span className="flex items-center gap-1.5">
+                  <LinkIcon className="w-3.5 h-3.5 text-sky-400" />
+                  Shareable Invite Link
+                </span>
+                <span className="text-[10px] text-teal-400 font-mono">No App Install Needed</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={inviteUrl}
+                  className="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono text-slate-300 bg-slate-950/80 select-all"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyInviteLink}
+                  className="py-2 px-3.5 rounded-xl text-xs font-semibold text-white btn-glow-primary flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  {copiedInviteLink ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleWhatsAppShare}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-600/20 transition-all"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Share Invite via WhatsApp</span>
+              </button>
+            </div>
+
+            {/* Direct Add Friend Form */}
+            <div className="mt-5 pt-5 border-t border-white/5">
+              <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-2">
+                Or Add Friend Directly
+              </h4>
+
+              {directAddMsg && (
+                <div className="mb-3 p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-xs text-teal-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{directAddMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleDirectAddFriend} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  required
+                  value={directFriendName}
+                  onChange={(e) => setDirectFriendName(e.target.value)}
+                  placeholder="Friend's Name (e.g. Karthik)"
+                  className="glass-input px-3 py-2 rounded-xl text-xs placeholder:text-slate-500"
+                />
+                <input
+                  type="text"
+                  value={directFriendUpi}
+                  onChange={(e) => setDirectFriendUpi(e.target.value)}
+                  placeholder="UPI ID (e.g. karthik@oksbi)"
+                  className="glass-input px-3 py-2 rounded-xl text-xs placeholder:text-slate-500"
+                />
+                <button
+                  type="submit"
+                  className="sm:col-span-2 py-2 px-3 rounded-xl text-xs font-semibold text-white btn-glow-teal flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add to Group Now</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Existing Members Chips */}
+            <div className="mt-4 pt-3 border-t border-white/5">
+              <div className="text-[11px] text-slate-400 mb-2">
+                Current Members ({selectedGroup.members.length}):
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                {selectedGroup.members.map((m) => (
+                  <span
+                    key={m}
+                    className="px-2.5 py-1 rounded-xl text-xs bg-slate-900 border border-sky-500/15 text-slate-300 flex items-center gap-1.5"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                    {m}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL 1: ADD EXPENSE */}
       {isAddExpenseOpen && (
