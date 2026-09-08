@@ -93,6 +93,37 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateProfile = async ({ name, upiId, avatar, phone }) => {
+    setIsLoading(true);
+    try {
+      const savedToken = token || localStorage.getItem("splitwme_jwt");
+      const res = await fetch("/api/auth/profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(savedToken ? { Authorization: `Bearer ${savedToken}` } : {})
+        },
+        body: JSON.stringify({ name, upiId, avatar, phone })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Profile update failed");
+      }
+
+      setUser(data.user);
+      if (data.token) {
+        setToken(data.token);
+        localStorage.setItem("splitwme_jwt", data.token);
+      }
+      return { success: true, user: data.user, token: data.token };
+    } catch (err) {
+      return { success: false, error: err.message };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -112,6 +143,7 @@ export function AuthProvider({ children }) {
         isLoading,
         login,
         register,
+        updateProfile,
         logout,
         isAuthenticated: !!user
       }}

@@ -38,22 +38,34 @@ import {
   AlertTriangle,
   UserMinus,
   Check,
-  UserCheck
+  UserCheck,
+  User as UserIcon,
+  Phone,
+  Camera
 } from "lucide-react";
 
+const AVATAR_PRESETS = [
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80"
+];
+
 export default function DashboardView() {
-  const { user, logout } = useAuth();
+  const { user, updateProfile, logout } = useAuth();
   const [groups, setGroups] = useState(INITIAL_GROUPS);
   const [selectedGroupId, setSelectedGroupId] = useState("group_1");
 
   // Modals state
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
-  const [editingExpenseId, setEditingExpenseId] = useState(null); // null if adding new
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
 
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [isNewGroupOpen, setIsNewGroupOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const [selectedQrSettlement, setSelectedQrSettlement] = useState(null);
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -62,6 +74,14 @@ export default function DashboardView() {
   // Group Settings Edit State
   const [editGroupName, setEditGroupName] = useState("");
   const [editGroupCategory, setEditGroupCategory] = useState("Trip");
+
+  // Profile Edit State
+  const [profileName, setProfileName] = useState(user?.name || "");
+  const [profileUpi, setProfileUpi] = useState(user?.upiId || "");
+  const [profileAvatar, setProfileAvatar] = useState(user?.avatar || AVATAR_PRESETS[0]);
+  const [profilePhone, setProfilePhone] = useState(user?.phone || "");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileStatusMsg, setProfileStatusMsg] = useState("");
 
   // Direct Add Friend state inside Invite Modal
   const [directFriendName, setDirectFriendName] = useState("");
@@ -89,6 +109,16 @@ export default function DashboardView() {
     }
   }, []);
 
+  // Sync profile edit state when user changes
+  useEffect(() => {
+    if (user) {
+      setProfileName(user.name || "");
+      setProfileUpi(user.upiId || "");
+      setProfileAvatar(user.avatar || AVATAR_PRESETS[0]);
+      setProfilePhone(user.phone || "");
+    }
+  }, [user]);
+
   // Sync groups from API on load
   useEffect(() => {
     async function fetchGroups() {
@@ -113,7 +143,7 @@ export default function DashboardView() {
       members: [user?.name || "Aniketh Reddy"],
       expenses: []
     };
-  }, [groups, selectedGroupId]);
+  }, [groups, selectedGroupId, user?.name]);
 
   // Sync Group Settings Modal when opening
   useEffect(() => {
@@ -154,6 +184,61 @@ export default function DashboardView() {
       activeGroupsCount: groups.length
     };
   }, [groups, user?.name]);
+
+  // Save Profile Handler
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    if (!profileName.trim()) return;
+
+    setProfileSaving(true);
+    setProfileStatusMsg("");
+
+    const res = await updateProfile({
+      name: profileName.trim(),
+      upiId: profileUpi.trim(),
+      avatar: profileAvatar,
+      phone: profilePhone.trim()
+    });
+
+    setProfileSaving(false);
+
+    if (res.success) {
+      setProfileStatusMsg("Profile updated successfully!");
+      // Update local groups state to reflect any new name/upiId/avatar
+      setGroups((prev) =>
+        prev.map((g) => {
+          const oldName = user?.name;
+          const newName = profileName.trim();
+          if (oldName && g.members?.includes(oldName)) {
+            const updatedMembers = g.members.map((m) => (m === oldName ? newName : m));
+            const updatedDetails = { ...(g.memberDetails || {}) };
+            if (updatedDetails[oldName]) {
+              const oldD = updatedDetails[oldName];
+              delete updatedDetails[oldName];
+              updatedDetails[newName] = {
+                ...oldD,
+                upiId: profileUpi.trim(),
+                avatar: profileAvatar
+              };
+            }
+            return {
+              ...g,
+              members: updatedMembers,
+              memberDetails: updatedDetails
+            };
+          }
+          return g;
+        })
+      );
+
+      setTimeout(() => {
+        setIsProfileModalOpen(false);
+        setProfileStatusMsg("");
+      }, 1000);
+    } else {
+      setProfileStatusMsg(res.error || "Failed to update profile");
+    }
+  };
 
   // Open Expense Modal for Creating
   const handleOpenAddExpense = () => {
@@ -234,14 +319,6 @@ export default function DashboardView() {
         date: "Just now",
         category: expenseCategory
       };
-
-      try {
-        await fetch(`/api/groups/${selectedGroup.id}`, {
-          method: "POST"
-        });
-      } catch (err) {
-        // Fallback
-      }
 
       setGroups((prev) =>
         prev.map((g) => {
@@ -393,7 +470,7 @@ export default function DashboardView() {
       memberDetails: {
         [user?.name || "Aniketh Reddy"]: {
           upiId: user?.upiId || "aniketh@okhdfcbank",
-          avatar: user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+          avatar: user?.avatar || AVATAR_PRESETS[0]
         }
       },
       expenses: []
@@ -530,9 +607,13 @@ export default function DashboardView() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* User Profile Info */}
-            <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-full glass-panel-subtle border border-sky-500/20">
-              <div className="w-7 h-7 rounded-full overflow-hidden bg-sky-900/50 flex items-center justify-center">
+            {/* User Profile Info (Clickable to Edit Profile) */}
+            <button
+              onClick={() => setIsProfileModalOpen(true)}
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-full glass-panel-subtle hover:bg-sky-500/15 border border-sky-500/20 hover:border-sky-400/40 transition-all cursor-pointer group"
+              title="Click to Edit Profile & UPI ID"
+            >
+              <div className="w-7 h-7 rounded-full overflow-hidden bg-sky-900/50 flex items-center justify-center border border-sky-400/30 group-hover:scale-105 transition-transform">
                 {user?.avatar ? (
                   <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
@@ -540,12 +621,15 @@ export default function DashboardView() {
                 )}
               </div>
               <div className="text-left pr-1">
-                <div className="text-xs font-semibold text-white leading-tight">{user?.name}</div>
+                <div className="text-xs font-semibold text-white leading-tight flex items-center gap-1">
+                  <span>{user?.name}</span>
+                  <Pencil className="w-3 h-3 text-sky-400 opacity-60 group-hover:opacity-100" />
+                </div>
                 <div className="text-[10px] text-sky-400 font-mono leading-tight">
                   {user?.upiId || "UPI Active"}
                 </div>
               </div>
-            </div>
+            </button>
 
             <button
               onClick={() => setIsNewGroupOpen(true)}
@@ -953,6 +1037,135 @@ export default function DashboardView() {
           </div>
         </div>
       </main>
+
+      {/* MODAL: EDIT USER PROFILE & UPI ID */}
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+          <div className="glass-panel w-full max-w-md rounded-3xl p-6 sm:p-7 relative border border-sky-500/30">
+            <button
+              onClick={() => setIsProfileModalOpen(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="p-2.5 rounded-2xl bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                <UserIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Edit Your Profile</h3>
+                <p className="text-xs text-slate-400">Update your payment UPI ID, display name, and avatar</p>
+              </div>
+            </div>
+
+            {profileStatusMsg && (
+              <div
+                className={`mb-4 p-3 rounded-xl text-xs flex items-center gap-2 border ${
+                  profileStatusMsg.includes("success")
+                    ? "bg-teal-500/10 border-teal-500/30 text-teal-300"
+                    : "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{profileStatusMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              {/* Avatar Selector */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Avatar</label>
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden bg-sky-950 border-2 border-sky-400/50 shrink-0">
+                    <img src={profileAvatar} alt="Current Avatar" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                    {AVATAR_PRESETS.map((avatarUrl, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setProfileAvatar(avatarUrl)}
+                        className={`w-10 h-10 rounded-xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 ${
+                          profileAvatar === avatarUrl
+                            ? "border-sky-400 scale-105 shadow-md shadow-sky-500/30"
+                            : "border-white/10 hover:border-sky-400/40 opacity-70 hover:opacity-100"
+                        }`}
+                      >
+                        <img src={avatarUrl} alt={`Avatar ${idx}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder="Your Full Name"
+                  className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-300">
+                    UPI ID / Payment Handle
+                  </label>
+                  <span className="text-[10px] text-teal-400 font-mono">For 1-Click Pay Links</span>
+                </div>
+                <div className="relative">
+                  <CreditCard className="w-4 h-4 text-sky-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    required
+                    value={profileUpi}
+                    onChange={(e) => setProfileUpi(e.target.value)}
+                    placeholder="e.g. yourname@okhdfcbank"
+                    className="glass-input w-full pl-10 pr-4 py-2.5 rounded-xl text-sm placeholder:text-slate-500 font-mono"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Friends in all your groups will pay you using this UPI handle.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Phone Number (Optional)</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-sky-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={profilePhone}
+                    onChange={(e) => setProfilePhone(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="glass-input w-full pl-10 pr-4 py-2.5 rounded-xl text-sm placeholder:text-slate-500"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={profileSaving}
+                className="w-full py-3 px-4 rounded-xl font-semibold text-white btn-glow-primary flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:opacity-50"
+              >
+                {profileSaving ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Save Profile & Update Handle</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: GROUP SETTINGS & MEMBER MANAGEMENT */}
       {isGroupSettingsOpen && (
