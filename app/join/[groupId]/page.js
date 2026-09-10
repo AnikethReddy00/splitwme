@@ -20,7 +20,9 @@ export default function JoinGroupPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const groupId = params.groupId;
+  
+  const rawGroupId = params?.groupId;
+  const groupId = rawGroupId ? decodeURIComponent(rawGroupId) : "";
 
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -32,28 +34,38 @@ export default function JoinGroupPage() {
   const [joinedSuccess, setJoinedSuccess] = useState(false);
 
   useEffect(() => {
+    if (!groupId) return;
+
+    let isMounted = true;
     async function fetchGroup() {
       try {
-        const res = await fetch(`/api/groups/${groupId}`);
+        setLoading(true);
+        setError("");
+        const res = await fetch(`/api/groups/${encodeURIComponent(groupId)}`);
         const data = await res.json();
+        
+        if (!isMounted) return;
+
         if (res.ok && data.group) {
           setGroup(data.group);
-          if (user?.name && data.group.members.includes(user.name)) {
+          if (user?.name && data.group.members?.includes(user.name)) {
             setJoinedSuccess(true);
           }
         } else {
           setError(data.error || "Group not found or expired invite link");
         }
       } catch (err) {
-        setError("Failed to load group details");
+        if (isMounted) setError("Failed to load group details");
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
 
-    if (groupId) {
-      fetchGroup();
-    }
+    fetchGroup();
+
+    return () => {
+      isMounted = false;
+    };
   }, [groupId, user]);
 
   const handleJoin = async (e) => {

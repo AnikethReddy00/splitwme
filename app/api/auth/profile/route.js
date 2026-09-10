@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyToken, signToken } from "@/lib/jwt";
 import { updateUserProfile, findUserById } from "@/lib/users";
-import { getAllGroups } from "@/lib/groupStore";
+import { getAllGroups, saveAllGroups } from "@/lib/groupStore";
 
 export async function PUT(request) {
   try {
@@ -38,8 +38,10 @@ export async function PUT(request) {
 
     // Update references in all active groups if name or upiId changed
     const groups = getAllGroups();
+    let groupsModified = false;
     groups.forEach((group) => {
       if (oldName && group.members?.includes(oldName)) {
+        groupsModified = true;
         if (name && name !== oldName) {
           group.members = group.members.map((m) => (m === oldName ? name : m));
           if (group.memberDetails && group.memberDetails[oldName]) {
@@ -64,6 +66,10 @@ export async function PUT(request) {
         }
       }
     });
+
+    if (groupsModified) {
+      saveAllGroups(groups);
+    }
 
     // Issue updated token
     const newToken = await signToken({

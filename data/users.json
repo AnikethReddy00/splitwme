@@ -1,0 +1,20 @@
+[
+  {
+    "id": "user_1",
+    "name": "Aniketh Reddy",
+    "email": "aniketh@splitwme.com",
+    "password": "password123",
+    "upiId": "aniketh@okhdfcbank",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    "phone": "+91 98765 43210"
+  },
+  {
+    "id": "user_1789068701129",
+    "name": "Varun Sharma",
+    "email": "varunsharma@guest.splitwme.com",
+    "password": "password123",
+    "upiId": "varun@oksbi",
+    "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=Varun%20Sharma",
+    "phone": ""
+  }
+]

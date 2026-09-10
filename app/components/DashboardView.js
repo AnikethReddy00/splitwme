@@ -459,22 +459,8 @@ export default function DashboardView() {
 
     const allMembers = Array.from(new Set([user?.name || "Aniketh Reddy", ...extraMembers]));
 
-    const newGroup = {
-      id: `grp_${Date.now()}`,
-      name: newGroupName.trim(),
-      category: newGroupCategory,
-      members: allMembers,
-      memberDetails: {
-        [user?.name || "Aniketh Reddy"]: {
-          upiId: user?.upiId || "aniketh@okhdfcbank",
-          avatar: user?.avatar || AVATAR_PRESETS[0]
-        }
-      },
-      expenses: []
-    };
-
     try {
-      await fetch("/api/groups", {
+      const res = await fetch("/api/groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -485,12 +471,32 @@ export default function DashboardView() {
           members: extraMembers
         })
       });
+
+      const data = await res.json();
+      if (res.ok && data.group) {
+        setGroups((prev) => [data.group, ...prev.filter((g) => g.id !== data.group.id)]);
+        setSelectedGroupId(data.group.id);
+      } else {
+        const fallbackGroup = {
+          id: `grp_${Date.now()}`,
+          name: newGroupName.trim(),
+          category: newGroupCategory,
+          members: allMembers,
+          memberDetails: {
+            [user?.name || "Aniketh Reddy"]: {
+              upiId: user?.upiId || "aniketh@okhdfcbank",
+              avatar: user?.avatar || AVATAR_PRESETS[0]
+            }
+          },
+          expenses: []
+        };
+        setGroups((prev) => [fallbackGroup, ...prev]);
+        setSelectedGroupId(fallbackGroup.id);
+      }
     } catch (err) {
       console.error("API create group error:", err);
     }
 
-    setGroups((prev) => [newGroup, ...prev]);
-    setSelectedGroupId(newGroup.id);
     setNewGroupName("");
     setNewGroupMembersText("");
     setIsNewGroupOpen(false);
@@ -543,18 +549,26 @@ export default function DashboardView() {
     setTimeout(() => setDirectAddMsg(""), 3500);
   };
 
+  const currentOrigin = typeof window !== "undefined" && window.location.origin 
+    ? window.location.origin 
+    : (originUrl || "");
+
   // Generate Invite URL
-  const inviteUrl = `${originUrl || "http://localhost:3000"}/join/${selectedGroup.id}`;
+  const inviteUrl = `${currentOrigin || "http://localhost:3001"}/join/${selectedGroup.id}`;
 
   const handleCopyInviteLink = () => {
-    navigator.clipboard.writeText(inviteUrl);
+    const realOrigin = typeof window !== "undefined" ? window.location.origin : (originUrl || "http://localhost:3001");
+    const link = `${realOrigin}/join/${selectedGroup.id}`;
+    navigator.clipboard.writeText(link);
     setCopiedInviteLink(true);
     setTimeout(() => setCopiedInviteLink(false), 3000);
   };
 
   const handleWhatsAppShare = () => {
+    const realOrigin = typeof window !== "undefined" ? window.location.origin : (originUrl || "http://localhost:3001");
+    const link = `${realOrigin}/join/${selectedGroup.id}`;
     const text = encodeURIComponent(
-      `Hey! Join our "${selectedGroup.name}" group on SplitWMe to track shared expenses & settle up in 1-click via UPI:\n👉 ${inviteUrl}`
+      `Hey! Join our "${selectedGroup.name}" group on SplitWMe to track shared expenses & settle up in 1-click via UPI:\n👉 ${link}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
   };

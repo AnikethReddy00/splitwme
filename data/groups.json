@@ -1,0 +1,54 @@
+[
+  {
+    "id": "grp_1789068685770",
+    "name": "Manali Trip 🏔️",
+    "category": "Trip",
+    "members": [
+      "Aniketh Reddy",
+      "Siddharth",
+      "Rohan",
+      "Varun Sharma"
+    ],
+    "memberDetails": {
+      "Aniketh Reddy": {
+        "upiId": "aniketh@okhdfcbank",
+        "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=Aniketh%20Reddy"
+      },
+      "Varun Sharma": {
+        "upiId": "varun@oksbi",
+        "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=Varun%20Sharma"
+      }
+    },
+    "expenses": []
+  },
+  {
+    "id": "group_1",
+    "name": "Goa Trip 🌴",
+    "category": "Vacation",
+    "members": [
+      "Aniketh Reddy"
+    ],
+    "memberDetails": {
+      "Aniketh Reddy": {
+        "upiId": "aniketh@okhdfcbank",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+      }
+    },
+    "expenses": []
+  },
+  {
+    "id": "group_2",
+    "name": "Apartment Flatmates 🏠",
+    "category": "Home",
+    "members": [
+      "Aniketh Reddy"
+    ],
+    "memberDetails": {
+      "Aniketh Reddy": {
+        "upiId": "aniketh@okhdfcbank",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+      }
+    },
+    "expenses": []
+  }
+]
