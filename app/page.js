@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import DashboardView from "./components/DashboardView";
+import ReceiptCard from "./components/ReceiptCard";
 import {
   Sparkles,
   Lock,
@@ -16,11 +17,17 @@ import {
   QrCode,
   Zap,
   ShieldCheck,
-  CreditCard
+  CreditCard,
+  Share2,
+  Receipt,
+  ArrowUpRight,
+  Check,
+  X
 } from "lucide-react";
 
 export default function Home() {
   const { user, login, register, isLoading } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("login"); // 'login' | 'register'
   
   // Login State
@@ -50,6 +57,8 @@ export default function Home() {
     const res = await login(loginEmail, loginPassword);
     if (!res.success) {
       setStatusMsg({ type: "error", text: res.error || "Authentication failed." });
+    } else {
+      setIsAuthModalOpen(false);
     }
   };
 
@@ -71,6 +80,8 @@ export default function Home() {
 
     if (!res.success) {
       setStatusMsg({ type: "error", text: res.error || "Registration failed." });
+    } else {
+      setIsAuthModalOpen(false);
     }
   };
 
@@ -81,324 +92,413 @@ export default function Home() {
     setStatusMsg({ type: "info", text: `Selected demo account: ${email}` });
   };
 
-  // If user is authenticated, render the interactive Dashboard!
+  // If user is authenticated, render the full Dashboard
   if (user) {
     return <DashboardView />;
   }
 
   return (
-    <main className="relative min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden bg-[#060b16]">
-      {/* Background Animated Gradient Mesh & Glowing Cloudy Blue/Teal Orbs */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {/* Top-left Cloudy Sky Orb */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 bg-sky-500/20 rounded-full blur-3xl animate-float-slow" />
-        
-        {/* Center-right Electric Teal Orb */}
-        <div className="absolute top-1/3 -right-24 w-[28rem] h-[28rem] bg-teal-500/18 rounded-full blur-3xl animate-float-reverse" />
-        
-        {/* Bottom-center Deep Cyan Glow */}
-        <div className="absolute -bottom-32 left-1/4 w-[32rem] h-[32rem] bg-sky-600/20 rounded-full blur-3xl animate-pulse-glow" />
-
-        {/* Subtle Grid Pattern Overlay */}
-        <div 
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: `radial-gradient(#38bdf8 1px, transparent 1px)`,
-            backgroundSize: "32px 32px"
-          }}
-        />
-      </div>
-
-      <div className="relative z-10 w-full max-w-lg">
-        {/* Brand Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full glass-panel-subtle text-xs font-medium text-sky-300 border border-sky-500/30 mb-3 shadow-[0_0_20px_rgba(56,189,248,0.2)]">
-            <Sparkles className="w-3.5 h-3.5 text-teal-400 animate-spin" style={{ animationDuration: "6s" }} />
-            <span>Smart Split & 1-Click UPI Settlement</span>
+    <main className="min-h-screen bg-white text-[#09090b] selection:bg-[#09090b] selection:text-white flex flex-col">
+      {/* Top Navbar */}
+      <header className="border-b border-[#e4e4e7] sticky top-0 z-30 bg-white/95 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#09090b] text-white flex items-center justify-center font-bold text-sm">
+              <Zap className="w-4 h-4 text-emerald-400" />
+            </div>
+            <span className="text-xl font-bold font-display tracking-tight text-[#09090b]">
+              SplitWMe
+            </span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white flex items-center justify-center gap-2">
-            Split<span className="text-gradient-cloudy">WMe</span>
-          </h1>
-          <p className="mt-1.5 text-sm text-slate-400">
-            Split group expenses effortlessly & settle instantly with GPay / UPI links
-          </p>
-        </div>
-
-        {/* Main Glassmorphic Auth Card */}
-        <div className="glass-panel rounded-3xl p-6 sm:p-8 backdrop-blur-2xl border border-sky-500/20 relative overflow-hidden transition-all duration-300 shadow-2xl">
-          
-          {/* Top Highlight Gradient */}
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-sky-400/80 to-transparent" />
-
-          {/* Tab Navigation */}
-          <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-900/80 border border-sky-500/20 mb-6 relative">
+          <div className="flex items-center gap-2.5">
             <button
-              type="button"
               onClick={() => {
                 setActiveTab("login");
-                setStatusMsg({ type: "", text: "" });
+                setIsAuthModalOpen(true);
               }}
-              className={`py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${
-                activeTab === "login"
-                  ? "bg-gradient-to-r from-sky-500/30 to-teal-500/30 text-sky-200 border border-sky-400/40 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+              className="py-2 px-4 rounded-xl text-xs font-semibold text-[#09090b] hover:bg-[#f4f4f5] transition-colors cursor-pointer"
             >
-              <Lock className="w-3.5 h-3.5" />
               Sign In
             </button>
-
             <button
-              type="button"
               onClick={() => {
                 setActiveTab("register");
-                setStatusMsg({ type: "", text: "" });
+                setIsAuthModalOpen(true);
               }}
-              className={`py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${
-                activeTab === "register"
-                  ? "bg-gradient-to-r from-sky-500/30 to-teal-500/30 text-sky-200 border border-sky-400/40 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+              className="py-2 px-4 rounded-xl text-xs font-semibold text-white btn-bharpai-primary flex items-center gap-1.5 cursor-pointer"
             >
-              <User className="w-3.5 h-3.5" />
-              Create Account
+              <span>Get Started Free</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
+        </div>
+      </header>
 
-          {/* Status Alert */}
-          {statusMsg.text && (
-            <div
-              className={`mb-5 p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all ${
-                statusMsg.type === "error"
-                  ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
-                  : statusMsg.type === "success"
-                  ? "bg-teal-500/10 border-teal-500/30 text-teal-300"
-                  : "bg-sky-500/10 border-sky-500/30 text-sky-300"
-              }`}
-            >
-              {statusMsg.type === "error" ? (
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-              )}
-              <span>{statusMsg.text}</span>
+      {/* Hero Section */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-16 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          
+          {/* Left Column: Value Prop */}
+          <div className="lg:col-span-7 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bharpai-pill text-xs font-medium text-[#09090b]">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Split bills over UPI. Friends never install anything.</span>
             </div>
-          )}
 
-          {/* LOGIN FORM */}
-          {activeTab === "login" && (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <h1 className="text-4xl sm:text-6xl font-black font-display tracking-tight text-[#09090b] leading-[1.08]">
+              One person collects, friends tap a link and pay by UPI with exact amount prefilled.
+            </h1>
+
+            <p className="text-base sm:text-lg text-[#71717a] max-w-xl leading-relaxed">
+              No app download or sign-up needed for payers. Share a link on WhatsApp, their UPI app (GPay / PhonePe / Paytm) opens with the exact fractional amount. Money goes directly to your bank account.
+            </p>
+
+            {/* Quick Actions */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setActiveTab("register");
+                  setIsAuthModalOpen(true);
+                }}
+                className="py-3.5 px-6 rounded-xl text-sm font-bold text-white btn-bharpai-primary flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                <span>Create a Split Group</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => {
+                  handleDemoFill("aniketh@splitwme.com", "password123");
+                  setIsAuthModalOpen(true);
+                }}
+                className="py-3.5 px-6 rounded-xl text-sm font-semibold btn-bharpai-secondary flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-600" />
+                <span>Try Demo: Aniketh</span>
+              </button>
+            </div>
+
+            {/* Key Trust Badges */}
+            <div className="pt-6 border-t border-[#e4e4e7] grid grid-cols-3 gap-4 text-left">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-sky-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <div className="text-xs font-bold text-[#09090b]">100% Direct UPI</div>
+                <div className="text-[11px] text-[#71717a]">Zero wallet lock-in</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-[#09090b]">Zero App Install</div>
+                <div className="text-[11px] text-[#71717a]">Payers tap & pay</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-[#09090b]">Smart Min-Cash</div>
+                <div className="text-[11px] text-[#71717a]">Fewest transfers</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Interactive Bharpai Receipt Simulator */}
+          <div className="lg:col-span-5">
+            <ReceiptCard
+              title="Goa Beach Villa & Seafood 🌴"
+              totalAmount={4800}
+              paidBy="Aniketh Reddy"
+              paidByUpi="aniketh@okhdfcbank"
+              initialMembers={["Aniketh Reddy", "Karthik", "Rohan", "Priya"]}
+            />
+          </div>
+
+        </div>
+      </section>
+
+      {/* 3-Step How It Works */}
+      <section className="bg-[#f4f4f5] border-y border-[#e4e4e7] py-16 sm:py-24">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <h2 className="text-2xl sm:text-4xl font-bold font-display tracking-tight text-[#09090b]">
+              How it works in 3 simple steps
+            </h2>
+            <p className="text-sm text-[#71717a] mt-2">
+              The fastest way to settle shared group expenses without the awkward math.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bharpai-card p-6 bg-white space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-[#09090b] text-white flex items-center justify-center font-bold text-sm">
+                1
+              </div>
+              <h3 className="text-lg font-bold font-display text-[#09090b]">
+                Add bill & who was there
+              </h3>
+              <p className="text-xs text-[#71717a] leading-relaxed">
+                Log the expense title, amount, and pick the specific friends who participated. Split equally or by custom subset.
+              </p>
+            </div>
+
+            <div className="bharpai-card p-6 bg-white space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-[#09090b] text-white flex items-center justify-center font-bold text-sm">
+                2
+              </div>
+              <h3 className="text-lg font-bold font-display text-[#09090b]">
+                Share 1-tap WhatsApp link
+              </h3>
+              <p className="text-xs text-[#71717a] leading-relaxed">
+                Copy the link or send a formatted WhatsApp reminder with direct settlement links or instant UPI QR codes.
+              </p>
+            </div>
+
+            <div className="bharpai-card p-6 bg-white space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-[#09090b] text-white flex items-center justify-center font-bold text-sm">
+                3
+              </div>
+              <h3 className="text-lg font-bold font-display text-[#09090b]">
+                Friends tap & UPI opens prefilled
+              </h3>
+              <p className="text-xs text-[#71717a] leading-relaxed">
+                Their UPI app (GPay, PhonePe, Paytm, CRED) launches with your name & exact amount. Money lands directly in your bank account.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#71717a]">
+        <div>© 2026 SplitWMe. All rights reserved.</div>
+        <div className="flex items-center gap-4">
+          <span>Direct UPI Transfers</span>
+          <span>•</span>
+          <span>No Middleware</span>
+          <span>•</span>
+          <span>Free Forever</span>
+        </div>
+      </footer>
+
+      {/* AUTH MODAL */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#09090b]/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bharpai-card max-w-md w-full p-6 sm:p-8 relative bg-white border border-[#e4e4e7] shadow-2xl">
+            <button
+              onClick={() => setIsAuthModalOpen(false)}
+              className="absolute top-5 right-5 text-[#71717a] hover:text-[#09090b] cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Brand in modal */}
+            <div className="text-center mb-6">
+              <div className="w-10 h-10 rounded-xl bg-[#09090b] text-white flex items-center justify-center font-bold text-sm mx-auto mb-2">
+                <Zap className="w-5 h-5 text-emerald-400" />
+              </div>
+              <h3 className="text-2xl font-black font-display tracking-tight text-[#09090b]">
+                {activeTab === "login" ? "Sign in to SplitWMe" : "Create your account"}
+              </h3>
+              <p className="text-xs text-[#71717a] mt-1">
+                Start logging expenses & collecting 1-tap UPI payments
+              </p>
+            </div>
+
+            {/* Tab switch */}
+            <div className="grid grid-cols-2 p-1 rounded-xl bg-[#f4f4f5] border border-[#e4e4e7] mb-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("login");
+                  setStatusMsg({ type: "", text: "" });
+                }}
+                className={`py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  activeTab === "login"
+                    ? "bg-white text-[#09090b] shadow-sm"
+                    : "text-[#71717a] hover:text-[#09090b]"
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("register");
+                  setStatusMsg({ type: "", text: "" });
+                }}
+                className={`py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  activeTab === "register"
+                    ? "bg-white text-[#09090b] shadow-sm"
+                    : "text-[#71717a] hover:text-[#09090b]"
+                }`}
+              >
+                Create Account
+              </button>
+            </div>
+
+            {/* Status Alert */}
+            {statusMsg.text && (
+              <div
+                className={`mb-4 p-3 rounded-xl text-xs flex items-start gap-2 border ${
+                  statusMsg.type === "error"
+                    ? "bg-rose-50 border-rose-200 text-rose-700"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                }`}
+              >
+                {statusMsg.type === "error" ? (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                )}
+                <span>{statusMsg.text}</span>
+              </div>
+            )}
+
+            {/* LOGIN FORM */}
+            {activeTab === "login" && (
+              <form onSubmit={handleLoginSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-medium text-[#09090b] mb-1">Email</label>
                   <input
                     type="email"
                     required
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="glass-input w-full pl-10 pr-4 py-2.5 rounded-xl text-sm placeholder:text-slate-500"
+                    className="bharpai-input w-full px-3.5 py-2.5 text-sm"
                   />
                 </div>
-              </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-medium text-slate-300">
-                    Password
-                  </label>
-                  <a
-                    href="#forgot"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      alert("Demo account password is: password123");
-                    }}
-                    className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
-                  >
-                    Forgot password?
-                  </a>
+                <div>
+                  <label className="block text-xs font-medium text-[#09090b] mb-1">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showLoginPassword ? "text" : "password"}
+                      required
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="bharpai-input w-full px-3.5 py-2.5 pr-10 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#71717a] hover:text-[#09090b]"
+                    >
+                      {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-sky-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type={showLoginPassword ? "text" : "password"}
-                    required
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="glass-input w-full pl-10 pr-10 py-2.5 rounded-xl text-sm placeholder:text-slate-500"
-                  />
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-3 px-4 rounded-xl font-bold text-white btn-bharpai-primary flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
+                >
+                  {isLoading ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span>Sign In</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+
+                {/* 1-Click Demo Login */}
+                <div className="pt-4 border-t border-[#e4e4e7]">
                   <button
                     type="button"
-                    onClick={() => setShowLoginPassword(!showLoginPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+                    onClick={() => handleDemoFill("aniketh@splitwme.com", "password123")}
+                    className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold btn-bharpai-secondary flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    {showLoginPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Auto-fill Demo: Aniketh Reddy</span>
                   </button>
                 </div>
-              </div>
+              </form>
+            )}
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 px-4 rounded-xl font-semibold text-white btn-glow-primary flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <span>Sign In</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-
-              {/* 1-Click Quick Demo Login */}
-              <div className="pt-4 border-t border-sky-500/15">
-                <button
-                  type="button"
-                  onClick={() => handleDemoFill("aniketh@splitwme.com", "password123")}
-                  className="w-full py-2.5 px-3 rounded-xl text-xs font-medium bg-sky-950/40 hover:bg-sky-500/20 hover:border-sky-400/50 border border-sky-500/20 text-sky-200 transition-all cursor-pointer text-center flex items-center justify-center gap-2"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-                  <span>Auto-fill Demo: Aniketh Reddy (aniketh@splitwme.com)</span>
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* REGISTER FORM */}
-          {activeTab === "register" && (
-            <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-sky-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            {/* REGISTER FORM */}
+            {activeTab === "register" && (
+              <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-medium text-[#09090b] mb-1">Full Name</label>
                   <input
                     type="text"
                     required
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    placeholder="John Doe"
-                    className="glass-input w-full pl-10 pr-4 py-2 rounded-xl text-sm placeholder:text-slate-500"
+                    placeholder="Aniketh Reddy"
+                    className="bharpai-input w-full px-3.5 py-2.5 text-sm"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-sky-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <div>
+                  <label className="block text-xs font-medium text-[#09090b] mb-1">Email Address</label>
                   <input
                     type="email"
                     required
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="john@example.com"
-                    className="glass-input w-full pl-10 pr-4 py-2 rounded-xl text-sm placeholder:text-slate-500"
+                    placeholder="you@example.com"
+                    className="bharpai-input w-full px-3.5 py-2.5 text-sm"
                   />
                 </div>
-              </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-medium text-slate-300">
-                    UPI ID / Payment Handle
-                  </label>
-                  <span className="text-[10px] text-teal-400 font-mono">For 1-Click Pay Links</span>
-                </div>
-                <div className="relative">
-                  <CreditCard className="w-4 h-4 text-teal-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-medium text-[#09090b]">
+                      Your UPI ID / Payment Handle
+                    </label>
+                    <span className="text-[10px] text-emerald-600 font-mono font-semibold">
+                      For receiving pay links
+                    </span>
+                  </div>
                   <input
                     type="text"
                     value={regUpi}
                     onChange={(e) => setRegUpi(e.target.value)}
-                    placeholder="yourname@okhdfcbank"
-                    className="glass-input w-full pl-10 pr-4 py-2 rounded-xl text-sm placeholder:text-slate-500"
+                    placeholder="e.g. yourname@okhdfcbank"
+                    className="bharpai-input w-full px-3.5 py-2.5 text-sm font-mono"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Password (min 6 chars)
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-sky-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type={showRegPassword ? "text" : "password"}
-                    required
-                    minLength={6}
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="glass-input w-full pl-10 pr-10 py-2 rounded-xl text-sm placeholder:text-slate-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowRegPassword(!showRegPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
-                  >
-                    {showRegPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
+                <div>
+                  <label className="block text-xs font-medium text-[#09090b] mb-1">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showRegPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="bharpai-input w-full px-3.5 py-2.5 pr-10 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#71717a] hover:text-[#09090b]"
+                    >
+                      {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 px-4 rounded-xl font-semibold text-white btn-glow-primary flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <span>Create Account</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-        </div>
-
-        {/* Feature Highlights Grid */}
-        <div className="mt-6 grid grid-cols-3 gap-3 text-center">
-          <div className="glass-panel-subtle p-3 rounded-2xl border border-sky-500/20">
-            <ShieldCheck className="w-4 h-4 text-sky-400 mx-auto mb-1" />
-            <div className="text-[11px] font-semibold text-slate-200">Bank-Grade Security</div>
-            <div className="text-[10px] text-slate-400">256-bit Encrypted</div>
-          </div>
-          
-          <div className="glass-panel-subtle p-3 rounded-2xl border border-sky-500/20">
-            <Zap className="w-4 h-4 text-teal-400 mx-auto mb-1" />
-            <div className="text-[11px] font-semibold text-slate-200">1-Click Settle</div>
-            <div className="text-[10px] text-slate-400">Direct UPI Link</div>
-          </div>
-
-          <div className="glass-panel-subtle p-3 rounded-2xl border border-sky-500/20">
-            <QrCode className="w-4 h-4 text-cyan-300 mx-auto mb-1" />
-            <div className="text-[11px] font-semibold text-slate-200">Smart Minimizer</div>
-            <div className="text-[10px] text-slate-400">Debt Simplification</div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-3 px-4 rounded-xl font-bold text-white btn-bharpai-primary flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
+                >
+                  {isLoading ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span>Create Account & Start</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
         </div>
-      </div>
+      )}
     </main>
   );
 }

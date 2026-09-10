@@ -1,17 +1,28 @@
+import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
-import CursorSpotlight from "./components/CursorSpotlight";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata = {
-  title: "SplitWMe - Smart Split & 1-Click UPI Settlement",
-  description: "Split expenses smartly and settle instantly with 1-click UPI & payment links",
+  title: "SplitWMe — Split bills over UPI. Friends never install anything.",
+  description: "One person collects, friends tap a link and pay by UPI with the exact amount prefilled. No app, no signup for payers. Free forever.",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className="dark h-full">
-      <body className="min-h-screen bg-[#060b16] text-slate-100 antialiased selection:bg-sky-500/30 selection:text-sky-200 overflow-x-hidden relative">
-        <CursorSpotlight />
+    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} h-full antialiased`}>
+      <body className="min-h-screen bg-[#ffffff] text-[#09090b] font-sans antialiased selection:bg-[#09090b] selection:text-[#ffffff] overflow-x-hidden">
         <AuthProvider>
           {children}
         </AuthProvider>
