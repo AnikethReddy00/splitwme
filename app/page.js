@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "./context/AuthContext";
 import DashboardView from "./components/DashboardView";
 import ReceiptCard from "./components/ReceiptCard";
@@ -25,8 +26,11 @@ import {
   X
 } from "lucide-react";
 
-export default function Home() {
+function HomePageContent() {
   const { user, login, register, isLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const initialGroupId = searchParams ? searchParams.get("group") : null;
+
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("login"); // 'login' | 'register'
   
@@ -92,9 +96,9 @@ export default function Home() {
     setStatusMsg({ type: "info", text: `Selected demo account: ${email}` });
   };
 
-  // If user is authenticated, render the full Dashboard
+  // If user is authenticated, render the full Dashboard with initialGroupId
   if (user) {
-    return <DashboardView />;
+    return <DashboardView initialGroupId={initialGroupId} />;
   }
 
   return (
@@ -500,5 +504,17 @@ export default function Home() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#ffffff]">
+        <div className="w-8 h-8 border-2 border-[#09090b] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <HomePageContent />
+    </Suspense>
   );
 }

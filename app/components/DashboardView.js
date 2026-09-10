@@ -52,10 +52,16 @@ const AVATAR_PRESETS = [
   "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80"
 ];
 
-export default function DashboardView() {
+export default function DashboardView({ initialGroupId }) {
   const { user, updateProfile, logout } = useAuth();
   const [groups, setGroups] = useState(INITIAL_GROUPS);
-  const [selectedGroupId, setSelectedGroupId] = useState("group_1");
+  const [selectedGroupId, setSelectedGroupId] = useState(initialGroupId || "group_1");
+
+  useEffect(() => {
+    if (initialGroupId) {
+      setSelectedGroupId(initialGroupId);
+    }
+  }, [initialGroupId]);
 
   // Modals state
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -127,13 +133,16 @@ export default function DashboardView() {
         const data = await res.json();
         if (res.ok && data.groups && data.groups.length > 0) {
           setGroups(data.groups);
+          if (initialGroupId && data.groups.some((g) => g.id === initialGroupId)) {
+            setSelectedGroupId(initialGroupId);
+          }
         }
       } catch (err) {
         console.error("Failed to load groups:", err);
       }
     }
     fetchGroups();
-  }, []);
+  }, [initialGroupId]);
 
   const selectedGroup = useMemo(() => {
     return groups.find((g) => g.id === selectedGroupId) || groups[0] || {
