@@ -670,7 +670,7 @@ export default function DashboardView({ initialGroupId }) {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 w-full space-y-6">
         
         {/* Glance Balance Summary Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           
           {/* Net Balance Card */}
           <div className="bharpai-card p-5 relative">
@@ -713,28 +713,6 @@ export default function DashboardView({ initialGroupId }) {
             <div className="mt-2 text-xs text-[#71717a]">
               Pay in 1-tap via GPay / UPI
             </div>
-          </div>
-
-          {/* Smart Settle Quick Hub */}
-          <div className="bharpai-card p-5 bg-[#09090b] text-white flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">
-                <span>Smart Settle</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
-                  Min-Flow
-                </span>
-              </div>
-              <div className="text-xs text-[#a1a1aa] mt-0.5">
-                {settlements.length} direct transfers needed to settle this group.
-              </div>
-            </div>
-            <button
-              onClick={() => setIsSettleModalOpen(true)}
-              className="mt-3 w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-white text-[#09090b] hover:bg-[#f4f4f5] flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-            >
-              <Zap className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Open Settle Hub</span>
-            </button>
           </div>
 
         </div>
