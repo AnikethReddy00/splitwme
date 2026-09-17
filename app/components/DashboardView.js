@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import ReceiptItemizerModal from "./ReceiptItemizerModal";
 import {
   INITIAL_GROUPS,
   calculateSmartSettlements,
@@ -41,7 +42,9 @@ import {
   UserCheck,
   User as UserIcon,
   Phone,
-  ArrowUpRight
+  ArrowUpRight,
+  UploadCloud,
+  Image as ImageIcon
 } from "lucide-react";
 
 const AVATAR_PRESETS = [
@@ -72,6 +75,7 @@ export default function DashboardView({ initialGroupId }) {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isItemizerOpen, setIsItemizerOpen] = useState(false);
 
   const [selectedQrSettlement, setSelectedQrSettlement] = useState(null);
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -340,6 +344,41 @@ export default function DashboardView({ initialGroupId }) {
     }
 
     setIsExpenseModalOpen(false);
+  };
+
+  // Handle adding expense directly from uploaded bill image itemizer
+  const handleApplyScannedExpense = async (payload) => {
+    const newExpense = {
+      id: `e_${Date.now()}`,
+      title: payload.title || "Uploaded Bill",
+      amount: Number(payload.amount),
+      paidBy: payload.paidBy || user?.name || "Aniketh Reddy",
+      splitBetween: payload.splitBetween && payload.splitBetween.length > 0 ? payload.splitBetween : selectedGroup.members,
+      date: "Just now",
+      category: payload.category || "Food"
+    };
+
+    try {
+      await fetch(`/api/groups/${selectedGroup.id}/expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newExpense)
+      });
+    } catch (err) {
+      console.error("API add scanned expense error:", err);
+    }
+
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id === selectedGroup.id) {
+          return {
+            ...g,
+            expenses: [newExpense, ...(g.expenses || [])]
+          };
+        }
+        return g;
+      })
+    );
   };
 
   // Handle Delete Expense
@@ -772,6 +811,14 @@ export default function DashboardView({ initialGroupId }) {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setIsItemizerOpen(true)}
+                    className="py-2.5 px-3.5 rounded-xl text-xs font-bold bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-900 flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                  >
+                    <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Upload Bill Image</span>
+                  </button>
+
                   <button
                     onClick={() => setIsInviteModalOpen(true)}
                     className="py-2.5 px-3.5 rounded-xl text-xs font-bold btn-bharpai-secondary flex items-center gap-1.5 cursor-pointer"
@@ -1305,6 +1352,30 @@ export default function DashboardView({ initialGroupId }) {
             </h3>
 
             <form onSubmit={handleSaveExpense} className="space-y-4">
+              {!editingExpenseId && (
+                <div className="p-3 rounded-2xl bg-zinc-50 border border-dashed border-zinc-300 hover:border-zinc-900 transition-all flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-zinc-900 text-white flex items-center justify-center">
+                      <UploadCloud className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-zinc-900">Have a bill / receipt image?</div>
+                      <div className="text-[10px] text-zinc-500 font-mono">Upload image to auto-extract items & prices</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsExpenseModalOpen(false);
+                      setIsItemizerOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-100 text-xs font-bold text-zinc-900 cursor-pointer shadow-xs transition-all"
+                  >
+                    Upload Image
+                  </button>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-[#09090b] mb-1">
                   Expense Description
@@ -1799,6 +1870,15 @@ export default function DashboardView({ initialGroupId }) {
           </div>
         </div>
       )}
+
+      {/* MODAL: UPLOAD & ITEMIZE BILL IMAGE */}
+      <ReceiptItemizerModal
+        isOpen={isItemizerOpen}
+        onClose={() => setIsItemizerOpen(false)}
+        groupMembers={selectedGroup.members || []}
+        currentUser={user?.name}
+        onApplyExpense={handleApplyScannedExpense}
+      />
     </div>
   );
 }

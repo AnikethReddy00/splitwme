@@ -34,7 +34,19 @@
         "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
       }
     },
-    "expenses": []
+    "expenses": [
+      {
+        "id": "e_1789637197673",
+        "title": "THE LOCAL DINERS",
+        "amount": 3538.13,
+        "paidBy": "Aniketh Reddy",
+        "splitBetween": [
+          "Aniketh Reddy"
+        ],
+        "date": "Just now",
+        "category": "Food"
+      }
+    ]
   },
   {
     "id": "group_2",
