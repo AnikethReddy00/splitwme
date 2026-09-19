@@ -59,6 +59,16 @@ export async function PUT(request) {
             if (exp.splitBetween?.includes(oldName)) {
               exp.splitBetween = exp.splitBetween.map((m) => (m === oldName ? name : m));
             }
+            if (exp.paidByShares && exp.paidByShares[oldName] !== undefined) {
+              const val = exp.paidByShares[oldName];
+              delete exp.paidByShares[oldName];
+              exp.paidByShares[name] = val;
+            }
+            if (exp.memberShares && exp.memberShares[oldName] !== undefined) {
+              const val = exp.memberShares[oldName];
+              delete exp.memberShares[oldName];
+              exp.memberShares[name] = val;
+            }
           });
         } else if (upiId && group.memberDetails && group.memberDetails[oldName]) {
           group.memberDetails[oldName].upiId = upiId;

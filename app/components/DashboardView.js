@@ -101,7 +101,9 @@ export default function DashboardView({ initialGroupId }) {
   // Expense form state
   const [expenseTitle, setExpenseTitle] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
+  const [expensePaidMode, setExpensePaidMode] = useState("single"); // 'single' | 'multiple'
   const [expensePaidBy, setExpensePaidBy] = useState(user?.name || "Aniketh Reddy");
+  const [expensePaidByShares, setExpensePaidByShares] = useState({}); // { [member]: number }
   const [expenseCategory, setExpenseCategory] = useState("Food");
   const [expenseSplitBetween, setExpenseSplitBetween] = useState([]);
 
@@ -257,7 +259,9 @@ export default function DashboardView({ initialGroupId }) {
     setEditingExpenseId(null);
     setExpenseTitle("");
     setExpenseAmount("");
-    setExpensePaidBy(user?.name || selectedGroup.members[0] || "Aniketh Reddy");
+    setExpensePaidMode("single");
+    setExpensePaidBy(user?.name || selectedGroup.members?.[0] || "Aniketh Reddy");
+    setExpensePaidByShares({});
     setExpenseCategory("Food");
     setExpenseSplitBetween(selectedGroup.members || []);
     setIsExpenseModalOpen(true);
@@ -268,7 +272,15 @@ export default function DashboardView({ initialGroupId }) {
     setEditingExpenseId(expense.id);
     setExpenseTitle(expense.title);
     setExpenseAmount(String(expense.amount));
-    setExpensePaidBy(expense.paidBy);
+    if (expense.paidByShares && typeof expense.paidByShares === "object" && Object.keys(expense.paidByShares).length > 0) {
+      setExpensePaidMode("multiple");
+      setExpensePaidByShares({ ...expense.paidByShares });
+      setExpensePaidBy(expense.paidBy || "Multiple People");
+    } else {
+      setExpensePaidMode("single");
+      setExpensePaidBy(expense.paidBy || user?.name || "Aniketh Reddy");
+      setExpensePaidByShares({});
+    }
     setExpenseCategory(expense.category || "Food");
     setExpenseSplitBetween(
       expense.splitBetween && expense.splitBetween.length > 0 
@@ -283,6 +295,23 @@ export default function DashboardView({ initialGroupId }) {
     e.preventDefault();
     if (!expenseTitle || !expenseAmount || Number(expenseAmount) <= 0) return;
 
+    const totalAmt = Number(expenseAmount);
+    let finalPaidBy = expensePaidBy;
+    let finalPaidByShares = null;
+
+    if (expensePaidMode === "multiple") {
+      const payers = Object.entries(expensePaidByShares).filter(([_, v]) => Number(v) > 0);
+      const totalContributed = Math.round(payers.reduce((sum, [_, v]) => sum + Number(v), 0) * 100) / 100;
+      if (Math.abs(totalContributed - totalAmt) > 0.05) {
+        alert(`Total paid by contributors (₹${totalContributed.toLocaleString()}) must equal the expense amount (₹${totalAmt.toLocaleString()}). Please balance the payments.`);
+        return;
+      }
+      if (payers.length > 0) {
+        finalPaidBy = payers.map(([m]) => m.split(" ")[0]).join(" & ") + " (Multi-Payer)";
+        finalPaidByShares = expensePaidByShares;
+      }
+    }
+
     const splitMembers = expenseSplitBetween.length > 0 
       ? expenseSplitBetween 
       : selectedGroup.members;
@@ -290,8 +319,9 @@ export default function DashboardView({ initialGroupId }) {
     if (editingExpenseId) {
       const updatedExpenseData = {
         title: expenseTitle.trim(),
-        amount: Number(expenseAmount),
-        paidBy: expensePaidBy,
+        amount: totalAmt,
+        paidBy: finalPaidBy,
+        paidByShares: finalPaidByShares,
         category: expenseCategory,
         splitBetween: splitMembers
       };
@@ -323,12 +353,23 @@ export default function DashboardView({ initialGroupId }) {
       const newExpense = {
         id: `e_${Date.now()}`,
         title: expenseTitle.trim(),
-        amount: Number(expenseAmount),
-        paidBy: expensePaidBy,
+        amount: totalAmt,
+        paidBy: finalPaidBy,
+        paidByShares: finalPaidByShares,
         splitBetween: splitMembers,
         date: "Just now",
         category: expenseCategory
       };
+
+      try {
+        await fetch(`/api/groups/${selectedGroup.id}/expenses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newExpense)
+        });
+      } catch (err) {
+        console.error("API add expense error:", err);
+      }
 
       setGroups((prev) =>
         prev.map((g) => {
@@ -908,6 +949,11 @@ export default function DashboardView({ initialGroupId }) {
                               <span className="px-1.5 py-0.2 rounded bg-[#f4f4f5] border border-[#e4e4e7] text-[10px] text-[#71717a] font-normal">
                                 {expense.category}
                               </span>
+                              {expense.paidByShares && (
+                                <span className="px-1.5 py-0.2 rounded bg-amber-50 border border-amber-200 text-[10px] text-amber-800 font-semibold">
+                                  Multi-Payer
+                                </span>
+                              )}
                               {expense.memberShares && (
                                 <span className="px-1.5 py-0.2 rounded bg-indigo-50 border border-indigo-200 text-[10px] text-indigo-700 font-semibold">
                                   Itemized
@@ -915,7 +961,19 @@ export default function DashboardView({ initialGroupId }) {
                               )}
                             </div>
                             <div className="text-xs text-[#71717a] flex flex-wrap items-center gap-1.5 mt-0.5">
-                              <span>Paid by <strong className="text-[#09090b]">{expense.paidBy}</strong></span>
+                              {expense.paidByShares && typeof expense.paidByShares === "object" ? (
+                                <span>
+                                  Paid by{" "}
+                                  <strong className="text-[#09090b]">
+                                    {Object.entries(expense.paidByShares)
+                                      .filter(([_, v]) => Number(v) > 0)
+                                      .map(([p, v]) => `${p.split(" ")[0]} (₹${Math.round(v).toLocaleString()})`)
+                                      .join(", ")}
+                                  </strong>
+                                </span>
+                              ) : (
+                                <span>Paid by <strong className="text-[#09090b]">{expense.paidBy}</strong></span>
+                              )}
                               <span>•</span>
                               <span>{expense.date || "Today"}</span>
                               <span>•</span>
@@ -1438,21 +1496,158 @@ export default function DashboardView({ initialGroupId }) {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[#09090b] mb-1">
-                  Who Paid the Bill?
-                </label>
-                <select
-                  value={expensePaidBy}
-                  onChange={(e) => setExpensePaidBy(e.target.value)}
-                  className="bharpai-input w-full px-3.5 py-2.5 text-sm bg-white"
-                >
-                  {selectedGroup.members?.map((m) => (
-                    <option key={m} value={m}>
-                      {m} {m === user?.name ? "(You)" : ""}
-                    </option>
-                  ))}
-                </select>
+              {/* Who Paid Section: Single vs Multi-Payer */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-[#09090b] font-display">
+                    Who Paid Upfront?
+                  </label>
+                  <div className="flex items-center bg-[#f4f4f5] p-0.5 rounded-lg text-[10px] font-semibold border border-[#e4e4e7]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpensePaidMode("single");
+                        setExpensePaidByShares({});
+                      }}
+                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                        expensePaidMode === "single"
+                          ? "bg-white text-[#09090b] shadow-xs font-bold"
+                          : "text-[#71717a] hover:text-[#09090b]"
+                      }`}
+                    >
+                      Single Person
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpensePaidMode("multiple");
+                        const initShares = {};
+                        selectedGroup.members?.forEach((m) => {
+                          initShares[m] = 0;
+                        });
+                        const curr = expensePaidBy || user?.name || selectedGroup.members?.[0];
+                        if (curr) {
+                          initShares[curr] = Number(expenseAmount) || 0;
+                        }
+                        setExpensePaidByShares(initShares);
+                      }}
+                      className={`px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                        expensePaidMode === "multiple"
+                          ? "bg-white text-[#09090b] shadow-xs font-bold"
+                          : "text-[#71717a] hover:text-[#09090b]"
+                      }`}
+                    >
+                      <Users className="w-2.5 h-2.5 text-indigo-500" />
+                      <span>Multiple People</span>
+                    </button>
+                  </div>
+                </div>
+
+                {expensePaidMode === "single" ? (
+                  <select
+                    value={expensePaidBy}
+                    onChange={(e) => setExpensePaidBy(e.target.value)}
+                    className="bharpai-input w-full px-3.5 py-2.5 text-sm bg-white"
+                  >
+                    {selectedGroup.members?.map((m) => (
+                      <option key={m} value={m}>
+                        {m} {m === user?.name ? "(You)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="space-y-2 p-3 rounded-2xl bg-[#f4f4f5] border border-[#e4e4e7]">
+                    <div className="flex items-center justify-between text-[11px] font-mono">
+                      <span className="text-[#71717a]">Enter amount paid by each:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const count = selectedGroup.members?.length || 1;
+                          const splitPerPerson = Math.round(((Number(expenseAmount) || 0) / count) * 100) / 100;
+                          const eqMap = {};
+                          selectedGroup.members?.forEach((m) => {
+                            eqMap[m] = splitPerPerson;
+                          });
+                          setExpensePaidByShares(eqMap);
+                        }}
+                        className="text-indigo-600 hover:text-indigo-800 underline font-semibold cursor-pointer"
+                      >
+                        Split Paid Equally
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {selectedGroup.members?.map((m) => {
+                        const val = expensePaidByShares[m] !== undefined && expensePaidByShares[m] !== null ? expensePaidByShares[m] : "";
+                        return (
+                          <div key={m} className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-white border border-[#e4e4e7]">
+                            <span className="text-xs font-semibold text-[#09090b] truncate max-w-[140px]">
+                              {m} {m === user?.name ? "(You)" : ""}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-mono text-zinc-400">₹</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0"
+                                value={val}
+                                onChange={(e) => {
+                                  const nextVal = Math.max(0, Number(e.target.value) || 0);
+                                  setExpensePaidByShares((prev) => ({
+                                    ...prev,
+                                    [m]: nextVal
+                                  }));
+                                }}
+                                className="w-24 px-2 py-1 text-xs text-right font-mono font-bold bharpai-input"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Multi-Payer Status Total */}
+                    {(() => {
+                      const totalPaid = Object.values(expensePaidByShares).reduce((s, v) => s + (Number(v) || 0), 0);
+                      const totalBill = Number(expenseAmount) || 0;
+                      const diff = Math.round((totalBill - totalPaid) * 100) / 100;
+
+                      return (
+                        <div className="flex items-center justify-between pt-1 border-t border-[#e4e4e7] text-[11px] font-mono">
+                          <span className="text-[#71717a]">
+                            Total Paid: <strong>₹{totalPaid.toLocaleString()}</strong> / ₹{totalBill.toLocaleString()}
+                          </span>
+                          {Math.abs(diff) < 0.01 ? (
+                            <span className="text-emerald-700 font-bold flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Exact Match
+                            </span>
+                          ) : diff > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const target = user?.name || selectedGroup.members?.[0];
+                                if (target) {
+                                  setExpensePaidByShares((prev) => ({
+                                    ...prev,
+                                    [target]: Math.round(((Number(prev[target]) || 0) + diff) * 100) / 100
+                                  }));
+                                }
+                              }}
+                              className="text-amber-700 hover:text-amber-900 underline font-semibold cursor-pointer"
+                            >
+                              +₹{diff.toLocaleString()} (Fill to you)
+                            </button>
+                          ) : (
+                            <span className="text-rose-600 font-bold">
+                              Exceeds by ₹{Math.abs(diff).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
 
               {/* Subset splitting selection */}

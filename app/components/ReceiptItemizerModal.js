@@ -63,6 +63,8 @@ export default function ReceiptItemizerModal({
   const [commonSplitMode, setCommonSplitMode] = useState("proportional");
 
   const [paidBy, setPaidBy] = useState(currentUser || groupMembers[0] || "Aniketh Reddy");
+  const [paidMode, setPaidMode] = useState("single"); // 'single' | 'multiple'
+  const [paidByShares, setPaidByShares] = useState({}); // { [member]: number }
   const [uploadStatus, setUploadStatus] = useState("Extracting items from bill image...");
 
   const fileInputRef = useRef(null);
@@ -467,10 +469,28 @@ export default function ReceiptItemizerModal({
 
     const involvedMembers = groupMembers.filter((m) => (memberFinalTotals[m] || 0) > 0.01);
 
+    let finalPaidBy = paidBy;
+    let finalPaidByShares = null;
+
+    if (paidMode === "multiple") {
+      const payers = Object.entries(paidByShares).filter(([_, v]) => Number(v) > 0);
+      const totalContributed = Math.round(payers.reduce((sum, [_, v]) => sum + Number(v), 0) * 100) / 100;
+      const targetTotal = Math.round(grandTotal * 100) / 100;
+      if (Math.abs(totalContributed - targetTotal) > 0.05) {
+        alert(`Total paid by contributors (₹${totalContributed.toLocaleString()}) must equal the grand total (₹${targetTotal.toLocaleString()}). Please balance the payments.`);
+        return;
+      }
+      if (payers.length > 0) {
+        finalPaidBy = payers.map(([m]) => m.split(" ")[0]).join(" & ") + " (Multi-Payer)";
+        finalPaidByShares = paidByShares;
+      }
+    }
+
     const expensePayload = {
       title: merchant.trim() || "Uploaded Bill",
       amount: Math.round(grandTotal * 100) / 100,
-      paidBy: paidBy,
+      paidBy: finalPaidBy,
+      paidByShares: finalPaidByShares,
       category: category,
       splitBetween: involvedMembers.length > 0 ? involvedMembers : groupMembers,
       items: items,
@@ -588,20 +608,91 @@ export default function ReceiptItemizerModal({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-[#71717a] mb-1 font-mono">
-                    Who Paid Upfront?
-                  </label>
-                  <select
-                    value={paidBy}
-                    onChange={(e) => setPaidBy(e.target.value)}
-                    className="bharpai-input w-full px-2 py-1.5 text-xs bg-white font-semibold"
-                  >
-                    {groupMembers.map((m) => (
-                      <option key={m} value={m}>
-                        {m} {m === currentUser ? "(You)" : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold uppercase text-[#71717a] font-mono">
+                      Who Paid Upfront?
+                    </label>
+                    <div className="flex items-center bg-zinc-200/60 p-0.5 rounded-md text-[9px] font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaidMode("single");
+                          setPaidByShares({});
+                        }}
+                        className={`px-1.5 py-0.2 rounded transition-all cursor-pointer ${
+                          paidMode === "single"
+                            ? "bg-white text-zinc-900 font-bold shadow-xs"
+                            : "text-zinc-600 hover:text-zinc-900"
+                        }`}
+                      >
+                        Single
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaidMode("multiple");
+                          const initShares = {};
+                          groupMembers.forEach((m) => {
+                            initShares[m] = 0;
+                          });
+                          const curr = paidBy || currentUser || groupMembers[0];
+                          if (curr) {
+                            initShares[curr] = Math.round(grandTotal * 100) / 100;
+                          }
+                          setPaidByShares(initShares);
+                        }}
+                        className={`px-1.5 py-0.2 rounded transition-all cursor-pointer ${
+                          paidMode === "multiple"
+                            ? "bg-white text-zinc-900 font-bold shadow-xs"
+                            : "text-zinc-600 hover:text-zinc-900"
+                        }`}
+                      >
+                        Multi-Payer
+                      </button>
+                    </div>
+                  </div>
+
+                  {paidMode === "single" ? (
+                    <select
+                      value={paidBy}
+                      onChange={(e) => setPaidBy(e.target.value)}
+                      className="bharpai-input w-full px-2 py-1.5 text-xs bg-white font-semibold"
+                    >
+                      {groupMembers.map((m) => (
+                        <option key={m} value={m}>
+                          {m} {m === currentUser ? "(You)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="grid grid-cols-2 gap-1 max-h-24 overflow-y-auto pr-0.5">
+                        {groupMembers.map((m) => {
+                          const val = paidByShares[m] !== undefined && paidByShares[m] !== null ? paidByShares[m] : "";
+                          return (
+                            <div key={m} className="flex items-center justify-between p-1 rounded-lg bg-white border border-[#e4e4e7] text-[10px]">
+                              <span className="truncate text-zinc-700 font-semibold">{m.split(" ")[0]}</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0"
+                                value={val}
+                                onChange={(e) => {
+                                  const nextVal = Math.max(0, Number(e.target.value) || 0);
+                                  setPaidByShares((prev) => ({
+                                    ...prev,
+                                    [m]: nextVal
+                                  }));
+                                }}
+                                className="w-14 text-right px-1 py-0.5 font-mono text-[10px] bharpai-input"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
