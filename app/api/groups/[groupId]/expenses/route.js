@@ -5,7 +5,19 @@ export async function POST(request, { params }) {
   try {
     const { groupId } = await params;
     const body = await request.json();
-    const { title, amount, paidBy, splitBetween, category, date } = body;
+    const {
+      title,
+      amount,
+      paidBy,
+      splitBetween,
+      category,
+      date,
+      memberShares,
+      items,
+      tax,
+      serviceCharge,
+      extraCharges
+    } = body;
 
     if (!title || !amount) {
       return NextResponse.json(
@@ -20,7 +32,12 @@ export async function POST(request, { params }) {
       paidBy,
       splitBetween,
       category,
-      date
+      date,
+      memberShares,
+      items,
+      tax,
+      serviceCharge,
+      extraCharges
     });
 
     if (result.error) {

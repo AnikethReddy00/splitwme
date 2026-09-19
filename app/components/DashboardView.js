@@ -355,7 +355,12 @@ export default function DashboardView({ initialGroupId }) {
       paidBy: payload.paidBy || user?.name || "Aniketh Reddy",
       splitBetween: payload.splitBetween && payload.splitBetween.length > 0 ? payload.splitBetween : selectedGroup.members,
       date: "Just now",
-      category: payload.category || "Food"
+      category: payload.category || "Food",
+      memberShares: payload.memberShares || null,
+      items: payload.items || null,
+      tax: Number(payload.tax) || 0,
+      serviceCharge: Number(payload.serviceCharge) || 0,
+      extraCharges: Number(payload.extraCharges) || 0
     };
 
     try {
@@ -903,6 +908,11 @@ export default function DashboardView({ initialGroupId }) {
                               <span className="px-1.5 py-0.2 rounded bg-[#f4f4f5] border border-[#e4e4e7] text-[10px] text-[#71717a] font-normal">
                                 {expense.category}
                               </span>
+                              {expense.memberShares && (
+                                <span className="px-1.5 py-0.2 rounded bg-indigo-50 border border-indigo-200 text-[10px] text-indigo-700 font-semibold">
+                                  Itemized
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-[#71717a] flex flex-wrap items-center gap-1.5 mt-0.5">
                               <span>Paid by <strong className="text-[#09090b]">{expense.paidBy}</strong></span>
@@ -922,7 +932,11 @@ export default function DashboardView({ initialGroupId }) {
                               ₹{Number(expense.amount).toLocaleString()}
                             </div>
                             <div className="text-[11px] text-[#71717a] font-mono">
-                              ₹{perPersonAmount}/person
+                              {expense.memberShares && user?.name && expense.memberShares[user.name] !== undefined ? (
+                                <span>Your share: <strong className="text-[#09090b]">₹{Math.round(expense.memberShares[user.name]).toLocaleString()}</strong></span>
+                              ) : (
+                                <span>₹{perPersonAmount}/person</span>
+                              )}
                             </div>
                           </div>
 
