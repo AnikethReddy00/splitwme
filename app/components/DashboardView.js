@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import ReceiptItemizerModal from "./ReceiptItemizerModal";
+import TripSummaryModal from "./TripSummaryModal";
 import {
   INITIAL_GROUPS,
   calculateSmartSettlements,
@@ -76,6 +77,7 @@ export default function DashboardView({ initialGroupId }) {
   const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isItemizerOpen, setIsItemizerOpen] = useState(false);
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
 
   const [selectedQrSettlement, setSelectedQrSettlement] = useState(null);
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -857,6 +859,15 @@ export default function DashboardView({ initialGroupId }) {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setIsSummaryModalOpen(true)}
+                    className="py-2.5 px-3.5 rounded-xl text-xs font-bold bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-900 flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                    title="Export Trip Summary, WhatsApp Message & Excel CSV"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Summary & Export</span>
+                  </button>
+
                   <button
                     onClick={() => setIsItemizerOpen(true)}
                     className="py-2.5 px-3.5 rounded-xl text-xs font-bold bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-900 flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
@@ -2087,6 +2098,14 @@ export default function DashboardView({ initialGroupId }) {
         groupMembers={selectedGroup.members || []}
         currentUser={user?.name}
         onApplyExpense={handleApplyScannedExpense}
+      />
+
+      {/* MODAL: TRIP SUMMARY, WHATSAPP & CSV EXPORT */}
+      <TripSummaryModal
+        isOpen={isSummaryModalOpen}
+        onClose={() => setIsSummaryModalOpen(false)}
+        group={selectedGroup}
+        originUrl={originUrl}
       />
     </div>
   );

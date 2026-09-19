@@ -19,7 +19,199 @@
         "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=Varun%20Sharma"
       }
     },
-    "expenses": []
+    "expenses": [
+      {
+        "id": "e_1789845424432",
+        "title": "Dinner",
+        "amount": 5000,
+        "paidBy": "Siddharth",
+        "paidByShares": null,
+        "splitBetween": [
+          "Aniketh Reddy",
+          "Siddharth",
+          "Rohan",
+          "Varun Sharma"
+        ],
+        "date": "Just now",
+        "category": "Food",
+        "memberShares": null,
+        "items": null,
+        "tax": 0,
+        "serviceCharge": 0,
+        "extraCharges": 0
+      },
+      {
+        "id": "e_1789845413698",
+        "title": "Drinks",
+        "amount": 10000,
+        "paidBy": "Varun Sharma",
+        "paidByShares": null,
+        "splitBetween": [
+          "Aniketh Reddy",
+          "Siddharth",
+          "Rohan",
+          "Varun Sharma"
+        ],
+        "date": "Just now",
+        "category": "Food",
+        "memberShares": null,
+        "items": null,
+        "tax": 0,
+        "serviceCharge": 0,
+        "extraCharges": 0
+      },
+      {
+        "id": "e_1789845403094",
+        "title": "scuba",
+        "amount": 12432,
+        "paidBy": "Aniketh Reddy",
+        "paidByShares": null,
+        "splitBetween": [
+          "Aniketh Reddy",
+          "Siddharth",
+          "Rohan",
+          "Varun Sharma"
+        ],
+        "date": "Just now",
+        "category": "Activities",
+        "memberShares": null,
+        "items": null,
+        "tax": 0,
+        "serviceCharge": 0,
+        "extraCharges": 0
+      },
+      {
+        "id": "e_1789845389077",
+        "title": "THE LOCAL DINERS",
+        "amount": 3110.13,
+        "paidBy": "Aniketh Reddy",
+        "paidByShares": null,
+        "splitBetween": [
+          "Aniketh Reddy",
+          "Siddharth",
+          "Rohan",
+          "Varun Sharma"
+        ],
+        "date": "Just now",
+        "category": "Food",
+        "memberShares": {
+          "Aniketh Reddy": 777.53,
+          "Siddharth": 777.53,
+          "Rohan": 777.53,
+          "Varun Sharma": 777.53
+        },
+        "items": [
+          {
+            "id": "item_1789845385371_0",
+            "name": "FLAVOURED MOJITO CUCUMBER MINT",
+            "qty": 1,
+            "price": 330,
+            "total": 330,
+            "splitMode": "equal",
+            "assignedMembers": [
+              "Aniketh Reddy",
+              "Siddharth",
+              "Rohan",
+              "Varun Sharma"
+            ],
+            "memberQuantities": {}
+          },
+          {
+            "id": "item_1789845385371_1",
+            "name": "LONG ISLAND ELEC",
+            "qty": 2,
+            "price": 340,
+            "total": 680,
+            "splitMode": "equal",
+            "assignedMembers": [
+              "Aniketh Reddy",
+              "Siddharth",
+              "Rohan",
+              "Varun Sharma"
+            ],
+            "memberQuantities": {}
+          },
+          {
+            "id": "item_1789845385371_2",
+            "name": "CRUNCHY SALAD",
+            "qty": 1,
+            "price": 160,
+            "total": 160,
+            "splitMode": "equal",
+            "assignedMembers": [
+              "Aniketh Reddy",
+              "Siddharth",
+              "Rohan",
+              "Varun Sharma"
+            ],
+            "memberQuantities": {}
+          },
+          {
+            "id": "item_1789845385371_3",
+            "name": "ASSORTED SATAY",
+            "qty": 1,
+            "price": 260,
+            "total": 260,
+            "splitMode": "equal",
+            "assignedMembers": [
+              "Aniketh Reddy",
+              "Siddharth",
+              "Rohan",
+              "Varun Sharma"
+            ],
+            "memberQuantities": {}
+          },
+          {
+            "id": "item_1789845385371_4",
+            "name": "TEQUILA CHICKEN",
+            "qty": 1,
+            "price": 320,
+            "total": 320,
+            "splitMode": "equal",
+            "assignedMembers": [
+              "Aniketh Reddy",
+              "Siddharth",
+              "Rohan",
+              "Varun Sharma"
+            ],
+            "memberQuantities": {}
+          },
+          {
+            "id": "item_1789845385371_5",
+            "name": "FAJITAS CHICKEN",
+            "qty": 1,
+            "price": 300,
+            "total": 300,
+            "splitMode": "equal",
+            "assignedMembers": [
+              "Aniketh Reddy",
+              "Siddharth",
+              "Rohan",
+              "Varun Sharma"
+            ],
+            "memberQuantities": {}
+          },
+          {
+            "id": "item_1789845385371_6",
+            "name": "SURF N TURF",
+            "qty": 1,
+            "price": 360,
+            "total": 360,
+            "splitMode": "equal",
+            "assignedMembers": [
+              "Aniketh Reddy",
+              "Siddharth",
+              "Rohan",
+              "Varun Sharma"
+            ],
+            "memberQuantities": {}
+          }
+        ],
+        "tax": 442.13,
+        "serviceCharge": 258,
+        "extraCharges": 0
+      }
+    ]
   },
   {
     "id": "group_1",
