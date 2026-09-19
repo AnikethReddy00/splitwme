@@ -208,6 +208,20 @@ export default function ReceiptItemizerModal({
         item.qty = q;
         item.price = p;
         item.total = Math.round(q * p * 100) / 100;
+
+        // If total allocated member quantities now exceed new item qty, proportionally scale/clamp
+        if (item.memberQuantities) {
+          let runningSum = 0;
+          const adjustedQtyMap = {};
+          Object.entries(item.memberQuantities).forEach(([m, val]) => {
+            const memberVal = Number(val) || 0;
+            const remainingBudget = Math.max(0, q - runningSum);
+            const clampedVal = Math.min(memberVal, remainingBudget);
+            adjustedQtyMap[m] = clampedVal;
+            runningSum += clampedVal;
+          });
+          item.memberQuantities = adjustedQtyMap;
+        }
       }
       next[index] = item;
       return next;
@@ -251,12 +265,11 @@ export default function ReceiptItemizerModal({
       const item = { ...next[itemIndex], splitMode: mode };
 
       if (mode === "qty" && (!item.memberQuantities || Object.keys(item.memberQuantities).length === 0)) {
-        // Initialize memberQuantities: if single member or previously assigned, distribute
+        // Initialize memberQuantities: assign up to item.qty to the payer/first member, 0 for others
         const initialQtyMap = {};
         groupMembers.forEach((m) => {
           initialQtyMap[m] = 0;
         });
-        // Default to assigning 1 to paidBy or first member if qty is 1, or leave 0 for manual assignment
         if (groupMembers.length > 0) {
           initialQtyMap[paidBy || groupMembers[0]] = Math.min(item.qty, 1);
         }
@@ -294,13 +307,21 @@ export default function ReceiptItemizerModal({
     });
   };
 
-  // Change quantity allocated to a specific member in 'qty' mode
+  // Change quantity allocated to a specific member in 'qty' mode (strictly capped at item.qty)
   const handleMemberQtyChange = (itemIndex, member, newQty) => {
-    const validQty = Math.max(0, Number(newQty) || 0);
     setItems((prev) => {
       const next = [...prev];
       const item = { ...next[itemIndex] };
       const qtyMap = { ...(item.memberQuantities || {}) };
+
+      const currentMemberQty = Number(qtyMap[member]) || 0;
+      const totalAssigned = Object.values(qtyMap).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      const totalOthers = Math.max(0, totalAssigned - currentMemberQty);
+      const maxAllowed = Math.max(0, item.qty - totalOthers);
+
+      const requested = Number(newQty) || 0;
+      const validQty = Math.min(maxAllowed, Math.max(0, requested));
+
       qtyMap[member] = validQty;
       item.memberQuantities = qtyMap;
       next[itemIndex] = item;
@@ -313,9 +334,20 @@ export default function ReceiptItemizerModal({
       const next = [...prev];
       const item = { ...next[itemIndex] };
       const qtyMap = { ...(item.memberQuantities || {}) };
+
       const current = Number(qtyMap[member]) || 0;
-      const updated = Math.max(0, current + delta);
-      qtyMap[member] = updated;
+      const totalAssigned = Object.values(qtyMap).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      const totalOthers = Math.max(0, totalAssigned - current);
+      const maxAllowed = Math.max(0, item.qty - totalOthers);
+
+      let updated = current + delta;
+      if (delta > 0) {
+        updated = Math.min(maxAllowed, updated);
+      } else {
+        updated = Math.max(0, updated);
+      }
+
+      qtyMap[member] = Math.round(updated * 100) / 100;
       item.memberQuantities = qtyMap;
       next[itemIndex] = item;
       return next;
@@ -779,6 +811,7 @@ export default function ReceiptItemizerModal({
                             {groupMembers.map((m) => {
                               const userQty = Number(qtyMap[m]) || 0;
                               const userCost = Math.round(userQty * (item.price || 0));
+                              const isAddDisabled = totalAssignedQty >= item.qty;
 
                               return (
                                 <div
@@ -802,7 +835,7 @@ export default function ReceiptItemizerModal({
                                       type="button"
                                       onClick={() => adjustMemberQtyStep(idx, m, -1)}
                                       disabled={userQty <= 0}
-                                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-zinc-100 text-zinc-600 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+                                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-zinc-100 text-zinc-600 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
                                     >
                                       <Minus className="w-3 h-3" />
                                     </button>
@@ -810,6 +843,7 @@ export default function ReceiptItemizerModal({
                                     <input
                                       type="number"
                                       min="0"
+                                      max={item.qty}
                                       step="0.5"
                                       value={userQty}
                                       onChange={(e) => handleMemberQtyChange(idx, m, e.target.value)}
@@ -819,7 +853,8 @@ export default function ReceiptItemizerModal({
                                     <button
                                       type="button"
                                       onClick={() => adjustMemberQtyStep(idx, m, 1)}
-                                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-zinc-100 text-zinc-600 cursor-pointer"
+                                      disabled={isAddDisabled}
+                                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-zinc-100 text-zinc-600 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
                                     >
                                       <Plus className="w-3 h-3" />
                                     </button>
