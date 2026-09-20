@@ -21,6 +21,67 @@
     },
     "expenses": [
       {
+        "id": "e_1789900491323",
+        "title": "Flight",
+        "amount": 70000,
+        "paidBy": "Aniketh & Rohan & Varun (Multi-Payer)",
+        "paidByShares": {
+          "Aniketh Reddy": 35000,
+          "Siddharth": 0,
+          "Rohan": 17500,
+          "Varun Sharma": 17500
+        },
+        "splitBetween": [
+          "Aniketh Reddy",
+          "Siddharth",
+          "Rohan"
+        ],
+        "date": "Just now",
+        "category": "Food",
+        "memberShares": null,
+        "items": null,
+        "tax": 0,
+        "serviceCharge": 0,
+        "extraCharges": 0
+      },
+      {
+        "id": "e_1789900457840",
+        "title": "Tent",
+        "amount": 1200,
+        "paidBy": "Siddharth",
+        "paidByShares": null,
+        "splitBetween": [
+          "Aniketh Reddy",
+          "Rohan"
+        ],
+        "date": "Just now",
+        "category": "Transport",
+        "memberShares": null,
+        "items": null,
+        "tax": 0,
+        "serviceCharge": 0,
+        "extraCharges": 0
+      },
+      {
+        "id": "e_1789900439283",
+        "title": "groceries",
+        "amount": 2000,
+        "paidBy": "Rohan",
+        "paidByShares": null,
+        "splitBetween": [
+          "Aniketh Reddy",
+          "Siddharth",
+          "Rohan"
+        ],
+        "date": "Just now",
+        "category": "Food",
+        "memberShares": null,
+        "items": null,
+        "tax": 0,
+        "serviceCharge": 0,
+        "extraCharges": 0
+      },
+      {
         "id": "e_1789845424432",
         "title": "Dinner",
         "amount": 5000,

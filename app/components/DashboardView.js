@@ -77,6 +77,7 @@ export default function DashboardView({ initialGroupId }) {
   const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isItemizerOpen, setIsItemizerOpen] = useState(false);
+  const [editingItemizedExpense, setEditingItemizedExpense] = useState(null);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
 
   const [selectedQrSettlement, setSelectedQrSettlement] = useState(null);
@@ -259,6 +260,7 @@ export default function DashboardView({ initialGroupId }) {
   // Open Expense Modal for Creating
   const handleOpenAddExpense = () => {
     setEditingExpenseId(null);
+    setEditingItemizedExpense(null);
     setExpenseTitle("");
     setExpenseAmount("");
     setExpensePaidMode("single");
@@ -271,6 +273,14 @@ export default function DashboardView({ initialGroupId }) {
 
   // Open Expense Modal for Editing
   const handleOpenEditExpense = (expense) => {
+    // If this expense is an itemized bill, open it directly in the full Itemizer Modal!
+    if (expense.items && Array.isArray(expense.items) && expense.items.length > 0) {
+      setEditingItemizedExpense(expense);
+      setIsItemizerOpen(true);
+      return;
+    }
+
+    setEditingItemizedExpense(null);
     setEditingExpenseId(expense.id);
     setExpenseTitle(expense.title);
     setExpenseAmount(String(expense.amount));
@@ -389,44 +399,85 @@ export default function DashboardView({ initialGroupId }) {
     setIsExpenseModalOpen(false);
   };
 
-  // Handle adding expense directly from uploaded bill image itemizer
-  const handleApplyScannedExpense = async (payload) => {
-    const newExpense = {
-      id: `e_${Date.now()}`,
-      title: payload.title || "Uploaded Bill",
-      amount: Number(payload.amount),
-      paidBy: payload.paidBy || user?.name || "Aniketh Reddy",
-      splitBetween: payload.splitBetween && payload.splitBetween.length > 0 ? payload.splitBetween : selectedGroup.members,
-      date: "Just now",
-      category: payload.category || "Food",
-      memberShares: payload.memberShares || null,
-      items: payload.items || null,
-      tax: Number(payload.tax) || 0,
-      serviceCharge: Number(payload.serviceCharge) || 0,
-      extraCharges: Number(payload.extraCharges) || 0
-    };
+  // Handle adding or updating expense from uploaded bill image itemizer
+  const handleApplyScannedExpense = async (payload, existingExpenseId = null) => {
+    if (existingExpenseId) {
+      const updatedExpense = {
+        title: payload.title || "Uploaded Bill",
+        amount: Number(payload.amount),
+        paidBy: payload.paidBy || user?.name || "Aniketh Reddy",
+        paidByShares: payload.paidByShares || null,
+        splitBetween: payload.splitBetween && payload.splitBetween.length > 0 ? payload.splitBetween : selectedGroup.members,
+        category: payload.category || "Food",
+        memberShares: payload.memberShares || null,
+        items: payload.items || null,
+        tax: Number(payload.tax) || 0,
+        serviceCharge: Number(payload.serviceCharge) || 0,
+        extraCharges: Number(payload.extraCharges) || 0
+      };
 
-    try {
-      await fetch(`/api/groups/${selectedGroup.id}/expenses`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newExpense)
-      });
-    } catch (err) {
-      console.error("API add scanned expense error:", err);
+      try {
+        await fetch(`/api/groups/${selectedGroup.id}/expenses/${existingExpenseId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedExpense)
+        });
+      } catch (err) {
+        console.error("API update scanned expense error:", err);
+      }
+
+      setGroups((prev) =>
+        prev.map((g) => {
+          if (g.id === selectedGroup.id) {
+            return {
+              ...g,
+              expenses: (g.expenses || []).map((exp) =>
+                exp.id === existingExpenseId ? { ...exp, ...updatedExpense } : exp
+              )
+            };
+          }
+          return g;
+        })
+      );
+    } else {
+      const newExpense = {
+        id: `e_${Date.now()}`,
+        title: payload.title || "Uploaded Bill",
+        amount: Number(payload.amount),
+        paidBy: payload.paidBy || user?.name || "Aniketh Reddy",
+        paidByShares: payload.paidByShares || null,
+        splitBetween: payload.splitBetween && payload.splitBetween.length > 0 ? payload.splitBetween : selectedGroup.members,
+        date: "Just now",
+        category: payload.category || "Food",
+        memberShares: payload.memberShares || null,
+        items: payload.items || null,
+        tax: Number(payload.tax) || 0,
+        serviceCharge: Number(payload.serviceCharge) || 0,
+        extraCharges: Number(payload.extraCharges) || 0
+      };
+
+      try {
+        await fetch(`/api/groups/${selectedGroup.id}/expenses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newExpense)
+        });
+      } catch (err) {
+        console.error("API add scanned expense error:", err);
+      }
+
+      setGroups((prev) =>
+        prev.map((g) => {
+          if (g.id === selectedGroup.id) {
+            return {
+              ...g,
+              expenses: [newExpense, ...(g.expenses || [])]
+            };
+          }
+          return g;
+        })
+      );
     }
-
-    setGroups((prev) =>
-      prev.map((g) => {
-        if (g.id === selectedGroup.id) {
-          return {
-            ...g,
-            expenses: [newExpense, ...(g.expenses || [])]
-          };
-        }
-        return g;
-      })
-    );
   };
 
   // Handle Delete Expense
@@ -869,7 +920,10 @@ export default function DashboardView({ initialGroupId }) {
                   </button>
 
                   <button
-                    onClick={() => setIsItemizerOpen(true)}
+                    onClick={() => {
+                      setEditingItemizedExpense(null);
+                      setIsItemizerOpen(true);
+                    }}
                     className="py-2.5 px-3.5 rounded-xl text-xs font-bold bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-900 flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
                   >
                     <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
@@ -1435,10 +1489,44 @@ export default function DashboardView({ initialGroupId }) {
             </h3>
 
             <form onSubmit={handleSaveExpense} className="space-y-4">
-              {!editingExpenseId && (
-                <div className="p-3 rounded-2xl bg-zinc-50 border border-dashed border-zinc-300 hover:border-zinc-900 transition-all flex items-center justify-between">
+              {editingExpenseId ? (
+                <div className="p-3 rounded-2xl bg-zinc-50 border border-dashed border-zinc-300 hover:border-zinc-900 transition-all flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-zinc-900 text-white flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-xl bg-zinc-900 text-white flex items-center justify-center shrink-0">
+                      <Receipt className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-zinc-900">Want item-by-item quantity splitting?</div>
+                      <div className="text-[10px] text-zinc-500 font-mono">Edit in the full itemized breakdown & taxes editor</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetExpense = selectedGroup.expenses?.find((e) => e.id === editingExpenseId);
+                      setIsExpenseModalOpen(false);
+                      setEditingItemizedExpense(
+                        targetExpense || {
+                          id: editingExpenseId,
+                          title: expenseTitle,
+                          amount: Number(expenseAmount) || 0,
+                          category: expenseCategory,
+                          paidBy: expensePaidBy,
+                          paidByShares: expensePaidByShares,
+                          splitBetween: expenseSplitBetween
+                        }
+                      );
+                      setIsItemizerOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-100 text-xs font-bold text-zinc-900 cursor-pointer shadow-xs transition-all shrink-0"
+                  >
+                    Open Itemizer
+                  </button>
+                </div>
+              ) : (
+                <div className="p-3 rounded-2xl bg-zinc-50 border border-dashed border-zinc-300 hover:border-zinc-900 transition-all flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-zinc-900 text-white flex items-center justify-center shrink-0">
                       <UploadCloud className="w-4 h-4 text-emerald-400" />
                     </div>
                     <div>
@@ -1450,9 +1538,10 @@ export default function DashboardView({ initialGroupId }) {
                     type="button"
                     onClick={() => {
                       setIsExpenseModalOpen(false);
+                      setEditingItemizedExpense(null);
                       setIsItemizerOpen(true);
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-100 text-xs font-bold text-zinc-900 cursor-pointer shadow-xs transition-all"
+                    className="px-3 py-1.5 rounded-xl bg-white border border-zinc-300 hover:bg-zinc-100 text-xs font-bold text-zinc-900 cursor-pointer shadow-xs transition-all shrink-0"
                   >
                     Upload Image
                   </button>
@@ -2094,10 +2183,14 @@ export default function DashboardView({ initialGroupId }) {
       {/* MODAL: UPLOAD & ITEMIZE BILL IMAGE */}
       <ReceiptItemizerModal
         isOpen={isItemizerOpen}
-        onClose={() => setIsItemizerOpen(false)}
+        onClose={() => {
+          setIsItemizerOpen(false);
+          setEditingItemizedExpense(null);
+        }}
         groupMembers={selectedGroup.members || []}
         currentUser={user?.name}
         onApplyExpense={handleApplyScannedExpense}
+        editingExpense={editingItemizedExpense}
       />
 
       {/* MODAL: TRIP SUMMARY, WHATSAPP & CSV EXPORT */}

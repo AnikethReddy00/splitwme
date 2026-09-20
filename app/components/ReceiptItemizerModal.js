@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   UploadCloud,
   FileText,
@@ -18,7 +18,8 @@ import {
   Percent,
   Sliders,
   CheckCircle2,
-  HelpCircle
+  HelpCircle,
+  Pencil
 } from "lucide-react";
 
 export default function ReceiptItemizerModal({
@@ -26,48 +27,112 @@ export default function ReceiptItemizerModal({
   onClose,
   groupMembers = [],
   currentUser,
-  onApplyExpense
+  onApplyExpense,
+  editingExpense = null
 }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Extracted Receipt Data
+  // Extracted / Editing Receipt Data
   const [parsedData, setParsedData] = useState(null);
   const [merchant, setMerchant] = useState("");
   const [category, setCategory] = useState("Food");
-  
-  // Array of item objects:
-  // {
-  //   id: string,
-  //   name: string,
-  //   qty: number,
-  //   price: number,
-  //   total: number,
-  //   splitMode: 'equal' | 'qty', // 'equal' = split line total among assigned members, 'qty' = assign specific quantities to members
-  //   assignedMembers: string[],
-  //   memberQuantities: { [memberName: string]: number }
-  // }
   const [items, setItems] = useState([]);
-  
-  // Common Fees & Surcharges (Shared across the whole bill)
   const [tax, setTax] = useState(0);
   const [serviceCharge, setServiceCharge] = useState(0);
-  const [extraCharges, setExtraCharges] = useState(0); // e.g. Delivery, Packaging, Surcharges
+  const [extraCharges, setExtraCharges] = useState(0);
   const [discount, setDiscount] = useState(0);
-  
-  // How common charges are distributed:
-  // 'proportional' = proportional to each person's item subtotal (most fair)
-  // 'equal' = split common charges equally among everyone participating
   const [commonSplitMode, setCommonSplitMode] = useState("proportional");
-
   const [paidBy, setPaidBy] = useState(currentUser || groupMembers[0] || "Aniketh Reddy");
-  const [paidMode, setPaidMode] = useState("single"); // 'single' | 'multiple'
-  const [paidByShares, setPaidByShares] = useState({}); // { [member]: number }
+  const [paidMode, setPaidMode] = useState("single");
+  const [paidByShares, setPaidByShares] = useState({});
   const [uploadStatus, setUploadStatus] = useState("Extracting items from bill image...");
 
   const fileInputRef = useRef(null);
+
+  // Sync state whenever editingExpense or isOpen changes
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (editingExpense) {
+      setParsedData({ isEdit: true });
+      setMerchant(editingExpense.title || "Itemized Bill");
+      setCategory(editingExpense.category || "Food");
+      setPaidBy(editingExpense.paidBy || currentUser || groupMembers[0] || "Aniketh Reddy");
+
+      if (
+        editingExpense.paidByShares &&
+        typeof editingExpense.paidByShares === "object" &&
+        Object.keys(editingExpense.paidByShares).length > 0
+      ) {
+        setPaidMode("multiple");
+        setPaidByShares({ ...editingExpense.paidByShares });
+      } else {
+        setPaidMode("single");
+        setPaidByShares({});
+      }
+
+      setTax(Number(editingExpense.tax) || 0);
+      setServiceCharge(Number(editingExpense.serviceCharge) || 0);
+      setExtraCharges(Number(editingExpense.extraCharges) || 0);
+      setDiscount(0);
+
+      if (editingExpense.items && Array.isArray(editingExpense.items) && editingExpense.items.length > 0) {
+        setItems(
+          editingExpense.items.map((item, idx) => ({
+            id: item.id || `item_${idx}_${Date.now()}`,
+            name: item.name || `Item ${idx + 1}`,
+            qty: Math.max(1, Number(item.qty) || 1),
+            price: Number(item.price) || 0,
+            total: Number(item.total) || (Math.max(1, Number(item.qty) || 1) * (Number(item.price) || 0)),
+            splitMode:
+              item.splitMode ||
+              (item.memberQuantities && Object.keys(item.memberQuantities).length > 0 ? "qty" : "equal"),
+            assignedMembers:
+              item.assignedMembers && item.assignedMembers.length > 0
+                ? item.assignedMembers
+                : [...groupMembers],
+            memberQuantities: item.memberQuantities || {}
+          }))
+        );
+      } else {
+        // Fallback if converting simple expense to itemized
+        setItems([
+          {
+            id: `item_${Date.now()}`,
+            name: editingExpense.title || "Bill Expense",
+            qty: 1,
+            price: Number(editingExpense.amount) || 0,
+            total: Number(editingExpense.amount) || 0,
+            splitMode: "equal",
+            assignedMembers:
+              editingExpense.splitBetween && editingExpense.splitBetween.length > 0
+                ? editingExpense.splitBetween
+                : [...groupMembers],
+            memberQuantities: {}
+          }
+        ]);
+      }
+    } else {
+      // New bill upload mode
+      setParsedData(null);
+      setSelectedImage(null);
+      setImagePreview(null);
+      setMerchant("");
+      setCategory("Food");
+      setItems([]);
+      setTax(0);
+      setServiceCharge(0);
+      setExtraCharges(0);
+      setDiscount(0);
+      setPaidBy(currentUser || groupMembers[0] || "Aniketh Reddy");
+      setPaidMode("single");
+      setPaidByShares({});
+      setErrorMessage("");
+    }
+  }, [editingExpense, isOpen]);
 
   if (!isOpen) return null;
 
@@ -500,7 +565,7 @@ export default function ReceiptItemizerModal({
       extraCharges: extraCharges - discount
     };
 
-    onApplyExpense(expensePayload);
+    onApplyExpense(expensePayload, editingExpense?.id);
     onClose();
   };
 
@@ -518,14 +583,20 @@ export default function ReceiptItemizerModal({
         {/* Modal Header */}
         <div className="flex items-center gap-3 pb-3 border-b border-[#e4e4e7] shrink-0">
           <div className="w-10 h-10 rounded-2xl bg-[#09090b] text-white flex items-center justify-center shadow-md">
-            <Receipt className="w-5 h-5 text-emerald-400" />
+            {editingExpense ? (
+              <Pencil className="w-5 h-5 text-emerald-400" />
+            ) : (
+              <Receipt className="w-5 h-5 text-emerald-400" />
+            )}
           </div>
           <div>
             <h3 className="text-lg sm:text-xl font-bold font-display text-[#09090b]">
-              Upload & Itemize Bill
+              {editingExpense ? "Edit Itemized Bill & Quantities" : "Upload & Itemize Bill"}
             </h3>
             <p className="text-xs text-[#71717a]">
-              Smart bill splitting with per-item quantity assignments and common taxes/surcharges.
+              {editingExpense
+                ? "Edit line items, individual quantities, price shares, taxes & surcharges"
+                : "Smart bill splitting with per-item quantity assignments and common taxes/surcharges."}
             </p>
           </div>
         </div>
@@ -1134,7 +1205,7 @@ export default function ReceiptItemizerModal({
                   }}
                   className="py-2.5 px-4 rounded-2xl text-xs font-semibold text-[#71717a] border border-[#e4e4e7] hover:bg-zinc-100 transition-colors cursor-pointer"
                 >
-                  Upload Another Bill
+                  {editingExpense ? "Re-scan Bill Image" : "Upload Another Bill"}
                 </button>
 
                 <button
@@ -1142,7 +1213,7 @@ export default function ReceiptItemizerModal({
                   onClick={handleSaveToGroup}
                   className="flex-1 py-2.5 px-5 rounded-2xl font-bold text-white bg-[#09090b] hover:bg-[#18181b] flex items-center justify-center gap-2 cursor-pointer shadow-lg transition-all text-xs"
                 >
-                  <span>Apply & Add Bill to Group</span>
+                  <span>{editingExpense ? "Save & Update Bill Changes" : "Apply & Add Bill to Group"}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
