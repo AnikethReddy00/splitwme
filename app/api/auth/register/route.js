@@ -1,27 +1,42 @@
 import { NextResponse } from "next/server";
-import { registerNewUser } from "@/lib/users";
+import { registerNewUser, validateUsername } from "@/lib/users";
 import { signToken } from "@/lib/jwt";
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { name, email, password, upiId, phone } = body;
+    const { username, name, email, password, upiId, phone } = body;
 
-    if (!name || !email || !password) {
+    if (!username || !name || !email || !password) {
       return NextResponse.json(
-        { error: "Name, email, and password are required" },
+        { error: "Username, full name, email, and password are required." },
+        { status: 400 }
+      );
+    }
+
+    const usernameCheck = validateUsername(username);
+    if (!usernameCheck.valid) {
+      return NextResponse.json(
+        { error: usernameCheck.error },
         { status: 400 }
       );
     }
 
     if (password.length < 6) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        { error: "Password must be at least 6 characters long." },
         { status: 400 }
       );
     }
 
-    const result = registerNewUser({ name, email, password, upiId, phone });
+    const result = registerNewUser({
+      username: usernameCheck.sanitized,
+      name,
+      email,
+      password,
+      upiId,
+      phone
+    });
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: 409 });
@@ -30,6 +45,7 @@ export async function POST(request) {
     const user = result.user;
     const tokenPayload = {
       id: user.id,
+      username: user.username,
       name: user.name,
       email: user.email,
       upiId: user.upiId,

@@ -84,6 +84,7 @@ export async function PUT(request) {
     // Issue updated token
     const newToken = await signToken({
       id: updatedUser.id,
+      username: updatedUser.username,
       name: updatedUser.name,
       email: updatedUser.email,
       upiId: updatedUser.upiId,

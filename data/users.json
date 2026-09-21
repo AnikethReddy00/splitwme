@@ -1,6 +1,7 @@
 [
   {
     "id": "user_1",
+    "username": "aniketh",
     "name": "Aniketh Reddy",
     "email": "aniketh@splitwme.com",
     "password": "password123",
@@ -10,11 +11,62 @@
   },
   {
     "id": "user_1789068701129",
+    "username": "varunsharma",
     "name": "Varun Sharma",
     "email": "varunsharma@guest.splitwme.com",
     "password": "password123",
     "upiId": "varun@oksbi",
     "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=Varun%20Sharma",
-    "phone": ""
+    "phone": "+91 98111 22334"
+  },
+  {
+    "id": "user_siddharth",
+    "username": "siddharth",
+    "name": "Siddharth Verma",
+    "email": "siddharth@splitwme.com",
+    "password": "password123",
+    "upiId": "siddharth@okicici",
+    "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=Siddharth%20Verma",
+    "phone": "+91 98222 33445"
+  },
+  {
+    "id": "user_rohan",
+    "username": "rohan",
+    "name": "Rohan Mehta",
+    "email": "rohan@splitwme.com",
+    "password": "password123",
+    "upiId": "rohan@paytm",
+    "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=Rohan%20Mehta",
+    "phone": "+91 98333 44556"
+  },
+  {
+    "id": "user_priya",
+    "username": "priyapatel",
+    "name": "Priya Patel",
+    "email": "priya@splitwme.com",
+    "password": "password123",
+    "upiId": "priya@okhdfcbank",
+    "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=Priya%20Patel",
+    "phone": "+91 98444 55667"
+  },
+  {
+    "id": "user_karthik",
+    "username": "karthikr",
+    "name": "Karthik Ram",
+    "email": "karthik@splitwme.com",
+    "password": "password123",
+    "upiId": "karthik@oksbi",
+    "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=Karthik%20Ram",
+    "phone": "+91 98555 66778"
+  },
+  {
+    "id": "user_neha",
+    "username": "nehagupta",
+    "name": "Neha Gupta",
+    "email": "neha@splitwme.com",
+    "password": "password123",
+    "upiId": "neha@okhdfcbank",
+    "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=Neha%20Gupta",
+    "phone": "+91 98666 77889"
   }
 ]

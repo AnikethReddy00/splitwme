@@ -23,7 +23,8 @@ import {
   Receipt,
   ArrowUpRight,
   Check,
-  X
+  X,
+  AtSign
 } from "lucide-react";
 
 function HomePageContent() {
@@ -40,6 +41,7 @@ function HomePageContent() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   
   // Register State
+  const [regUsername, setRegUsername] = useState("");
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
@@ -70,12 +72,20 @@ function HomePageContent() {
     e.preventDefault();
     setStatusMsg({ type: "", text: "" });
 
+    const cleanUsername = regUsername.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    if (!cleanUsername || cleanUsername.length < 3) {
+      setStatusMsg({ type: "error", text: "Username must be at least 3 characters (lowercase letters and numbers only, no symbols or spaces)." });
+      return;
+    }
+
     if (!regName || !regEmail || !regPassword) {
       setStatusMsg({ type: "error", text: "Please fill in all required fields." });
       return;
     }
 
     const res = await register({
+      username: cleanUsername,
       name: regName,
       email: regEmail,
       password: regPassword,
@@ -420,6 +430,37 @@ function HomePageContent() {
             {/* REGISTER FORM */}
             {activeTab === "register" && (
               <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-medium text-[#09090b]">Username</label>
+                    <span className="text-[10px] text-zinc-500 font-mono">No caps, symbols or spaces</span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-zinc-400 font-bold text-sm">@</span>
+                    <input
+                      type="text"
+                      required
+                      value={regUsername}
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20);
+                        setRegUsername(val);
+                      }}
+                      placeholder="e.g. aniketh"
+                      className="bharpai-input w-full pl-8 pr-3.5 py-2.5 text-sm font-mono"
+                    />
+                  </div>
+                  {regUsername ? (
+                    <p className="text-[11px] mt-1 text-emerald-600 flex items-center gap-1 font-mono">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Handle: @{regUsername}</span>
+                    </p>
+                  ) : (
+                    <p className="text-[10px] mt-1 text-zinc-400">
+                      Lowercase letters (a-z) and numbers (0-9) only.
+                    </p>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-xs font-medium text-[#09090b] mb-1">Full Name</label>
                   <input

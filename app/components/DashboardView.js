@@ -45,7 +45,10 @@ import {
   Phone,
   ArrowUpRight,
   UploadCloud,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Search,
+  AtSign,
+  Shield
 } from "lucide-react";
 
 const AVATAR_PRESETS = [
@@ -115,6 +118,17 @@ export default function DashboardView({ initialGroupId }) {
   const [newGroupCategory, setNewGroupCategory] = useState("Trip");
   const [newGroupMembersText, setNewGroupMembersText] = useState("");
 
+  // Directory & Member Search State (Binary Search Lookup)
+  const [directoryUsers, setDirectoryUsers] = useState([]);
+  const [selectedNewMembers, setSelectedNewMembers] = useState([]); // [{ id, name, username, upiId, avatar, isCustom }]
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const [directorySuggestions, setDirectorySuggestions] = useState([]);
+  const [showDirectoryDropdown, setShowDirectoryDropdown] = useState(false);
+
+  // Direct Add Friend state in Invite Modal
+  const [inviteFriendSuggestions, setInviteFriendSuggestions] = useState([]);
+  const [showInviteSuggestions, setShowInviteSuggestions] = useState(false);
+
   // Base URL for invite links
   const [originUrl, setOriginUrl] = useState("");
 
@@ -134,7 +148,138 @@ export default function DashboardView({ initialGroupId }) {
     }
   }, [user]);
 
-  // Sync groups from API on load
+  // Load user directory for Binary Search on mount or modal open
+  useEffect(() => {
+    async function loadDirectory() {
+      try {
+        const res = await fetch("/api/users/search?limit=100");
+        const data = await res.json();
+        if (res.ok && data.users) {
+          setDirectoryUsers(data.users);
+        }
+      } catch (err) {
+        console.error("Failed to load user directory:", err);
+      }
+    }
+    loadDirectory();
+  }, [isNewGroupOpen, isInviteModalOpen]);
+
+  // Binary Search helper across sorted user directory
+  const binarySearchDirectory = (usersList, query) => {
+    if (!usersList || usersList.length === 0) return [];
+    const clean = (query || "").trim().toLowerCase().replace(/^@/, "");
+    if (!clean) return usersList.slice(0, 8);
+
+    // 1. Binary Search by username prefix on sorted array
+    const sortedByUsername = [...usersList].sort((a, b) =>
+      (a.username || "").toLowerCase().localeCompare((b.username || "").toLowerCase())
+    );
+
+    let low = 0;
+    let high = sortedByUsername.length - 1;
+    let firstIdx = -1;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      const val = (sortedByUsername[mid].username || "").toLowerCase();
+      if (val >= clean) {
+        firstIdx = mid;
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
+    }
+
+    const usernameMatches = [];
+    if (firstIdx !== -1) {
+      for (let i = firstIdx; i < sortedByUsername.length; i++) {
+        const val = (sortedByUsername[i].username || "").toLowerCase();
+        if (val.startsWith(clean)) {
+          usernameMatches.push(sortedByUsername[i]);
+        } else {
+          break;
+        }
+      }
+    }
+
+    // 2. Binary Search by name prefix on sorted array
+    const sortedByName = [...usersList].sort((a, b) =>
+      (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase())
+    );
+
+    let lowN = 0;
+    let highN = sortedByName.length - 1;
+    let firstIdxN = -1;
+
+    while (lowN <= highN) {
+      const mid = Math.floor((lowN + highN) / 2);
+      const val = (sortedByName[mid].name || "").toLowerCase();
+      if (val >= clean) {
+        firstIdxN = mid;
+        highN = mid - 1;
+      } else {
+        lowN = mid + 1;
+      }
+    }
+
+    const nameMatches = [];
+    if (firstIdxN !== -1) {
+      for (let i = firstIdxN; i < sortedByName.length; i++) {
+        const val = (sortedByName[i].name || "").toLowerCase();
+        if (val.startsWith(clean)) {
+          nameMatches.push(sortedByName[i]);
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Combine & deduplicate preserving username match precedence
+    const seen = new Set();
+    const results = [];
+    [...usernameMatches, ...nameMatches].forEach((u) => {
+      const key = u.id || u.username;
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push(u);
+      }
+    });
+
+    return results.slice(0, 10);
+  };
+
+  // Recompute Create Group member suggestions with Binary Search
+  useEffect(() => {
+    const alreadyAddedNames = new Set(selectedNewMembers.map((m) => m.name.toLowerCase()));
+    const alreadyAddedUsernames = new Set(
+      selectedNewMembers.map((m) => (m.username || "").toLowerCase()).filter(Boolean)
+    );
+    const currentUserName = (user?.name || "").toLowerCase();
+    const currentUsername = (user?.username || "").toLowerCase();
+
+    const candidatePool = directoryUsers.filter((u) => {
+      const uName = (u.name || "").toLowerCase();
+      const uHandle = (u.username || "").toLowerCase();
+      if (uName === currentUserName || (currentUsername && uHandle === currentUsername)) return false;
+      if (alreadyAddedNames.has(uName) || (uHandle && alreadyAddedUsernames.has(uHandle))) return false;
+      return true;
+    });
+
+    const matches = binarySearchDirectory(candidatePool, memberSearchQuery);
+    setDirectorySuggestions(matches);
+  }, [memberSearchQuery, directoryUsers, selectedNewMembers, user]);
+
+  // Recompute Invite modal friend suggestions with Binary Search
+  useEffect(() => {
+    if (!directFriendName || !showInviteSuggestions) {
+      setInviteFriendSuggestions([]);
+      return;
+    }
+    const currentMembers = new Set((selectedGroup?.members || []).map((m) => m.toLowerCase()));
+    const candidatePool = directoryUsers.filter((u) => !currentMembers.has(u.name.toLowerCase()));
+    const matches = binarySearchDirectory(candidatePool, directFriendName);
+    setInviteFriendSuggestions(matches);
+  }, [directFriendName, directoryUsers, selectedGroup, showInviteSuggestions]);
   useEffect(() => {
     async function fetchGroups() {
       try {
@@ -594,17 +739,74 @@ export default function DashboardView({ initialGroupId }) {
     setIsGroupSettingsOpen(false);
   };
 
+  const handleOpenCreateGroupModal = () => {
+    setNewGroupName("");
+    setNewGroupCategory("Trip");
+    setSelectedNewMembers([]);
+    setMemberSearchQuery("");
+    setShowDirectoryDropdown(false);
+    setIsNewGroupOpen(true);
+  };
+
+  const handleSelectDirectoryUser = (u) => {
+    if (!selectedNewMembers.some((m) => m.name === u.name || (u.username && m.username === u.username))) {
+      setSelectedNewMembers((prev) => [
+        ...prev,
+        {
+          id: u.id,
+          name: u.name,
+          username: u.username,
+          upiId: u.upiId,
+          avatar: u.avatar
+        }
+      ]);
+    }
+    setMemberSearchQuery("");
+    setShowDirectoryDropdown(false);
+  };
+
+  const handleAddCustomMember = (customName) => {
+    const clean = customName.trim();
+    if (!clean) return;
+    if (clean.toLowerCase() === (user?.name || "").toLowerCase()) return;
+    if (selectedNewMembers.some((m) => m.name.toLowerCase() === clean.toLowerCase())) return;
+
+    const sanitizedUsername = clean.toLowerCase().replace(/[^a-z0-9]/g, "");
+    setSelectedNewMembers((prev) => [
+      ...prev,
+      {
+        name: clean,
+        username: sanitizedUsername || "member",
+        upiId: `${sanitizedUsername || "member"}@upi`,
+        avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(clean)}`,
+        isCustom: true
+      }
+    ]);
+    setMemberSearchQuery("");
+    setShowDirectoryDropdown(false);
+  };
+
+  const handleRemoveNewMember = (indexToRemove) => {
+    setSelectedNewMembers((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   // Handle Creating a New Group
   const handleCreateGroup = async (e) => {
     e.preventDefault();
     if (!newGroupName.trim()) return;
 
-    const extraMembers = newGroupMembersText
-      .split(",")
-      .map((m) => m.trim())
-      .filter((m) => m.length > 0);
+    const extraMemberNames = selectedNewMembers.map((m) => m.name);
+    const extraMemberDetails = {};
+    selectedNewMembers.forEach((m) => {
+      extraMemberDetails[m.name] = {
+        upiId: m.upiId || `${m.name.toLowerCase().replace(/\s+/g, "")}@upi`,
+        avatar: m.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(m.name)}`,
+        username: m.username
+      };
+    });
 
-    const allMembers = Array.from(new Set([user?.name || "Aniketh Reddy", ...extraMembers]));
+    const creatorDisplayName = user?.name || "Aniketh Reddy";
+    const allMembers = Array.from(new Set([creatorDisplayName, ...extraMemberNames]));
 
     try {
       const res = await fetch("/api/groups", {
@@ -613,9 +815,11 @@ export default function DashboardView({ initialGroupId }) {
         body: JSON.stringify({
           name: newGroupName.trim(),
           category: newGroupCategory,
-          creatorName: user?.name,
-          creatorUpi: user?.upiId,
-          members: extraMembers
+          creatorName: creatorDisplayName,
+          creatorUpi: user?.upiId || "aniketh@okhdfcbank",
+          creatorAvatar: user?.avatar || AVATAR_PRESETS[0],
+          members: extraMemberNames,
+          memberDetails: extraMemberDetails
         })
       });
 
@@ -630,10 +834,12 @@ export default function DashboardView({ initialGroupId }) {
           category: newGroupCategory,
           members: allMembers,
           memberDetails: {
-            [user?.name || "Aniketh Reddy"]: {
+            [creatorDisplayName]: {
               upiId: user?.upiId || "aniketh@okhdfcbank",
-              avatar: user?.avatar || AVATAR_PRESETS[0]
-            }
+              avatar: user?.avatar || AVATAR_PRESETS[0],
+              username: user?.username || "aniketh"
+            },
+            ...extraMemberDetails
           },
           expenses: []
         };
@@ -645,7 +851,8 @@ export default function DashboardView({ initialGroupId }) {
     }
 
     setNewGroupName("");
-    setNewGroupMembersText("");
+    setSelectedNewMembers([]);
+    setMemberSearchQuery("");
     setIsNewGroupOpen(false);
   };
 
@@ -786,7 +993,7 @@ export default function DashboardView({ initialGroupId }) {
             </button>
 
             <button
-              onClick={() => setIsNewGroupOpen(true)}
+              onClick={handleOpenCreateGroupModal}
               className="py-2 px-3.5 rounded-xl text-xs font-bold text-white btn-bharpai-primary flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -1912,29 +2119,72 @@ export default function DashboardView({ initialGroupId }) {
                 </div>
               )}
 
-              <form onSubmit={handleDirectAddFriend} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  required
-                  value={directFriendName}
-                  onChange={(e) => setDirectFriendName(e.target.value)}
-                  placeholder="Friend's Name (e.g. Karthik)"
-                  className="bharpai-input px-3 py-2 text-xs"
-                />
-                <input
-                  type="text"
-                  value={directFriendUpi}
-                  onChange={(e) => setDirectFriendUpi(e.target.value)}
-                  placeholder="UPI ID (e.g. karthik@oksbi)"
-                  className="bharpai-input px-3 py-2 text-xs font-mono"
-                />
-                <button
-                  type="submit"
-                  className="sm:col-span-2 py-2 px-3 rounded-xl text-xs font-bold text-white btn-bharpai-primary flex items-center justify-center gap-1.5 cursor-pointer mt-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add to Group Now</span>
-                </button>
+              <form onSubmit={handleDirectAddFriend} className="space-y-2 relative">
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={directFriendName}
+                    onFocus={() => setShowInviteSuggestions(true)}
+                    onChange={(e) => {
+                      setDirectFriendName(e.target.value);
+                      setShowInviteSuggestions(true);
+                    }}
+                    placeholder="Search username (@siddharth) or Friend's Name"
+                    className="bharpai-input w-full px-3 py-2 text-xs"
+                  />
+                  {showInviteSuggestions && inviteFriendSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-[#e4e4e7] rounded-xl shadow-xl max-h-48 overflow-y-auto p-1.5 space-y-1">
+                      <div className="px-2 py-1 text-[10px] font-mono uppercase text-zinc-400 font-bold flex items-center gap-1">
+                        <Zap className="w-3 h-3 text-emerald-500" />
+                        <span>Directory Match (Binary Search)</span>
+                      </div>
+                      {inviteFriendSuggestions.map((u) => (
+                        <div
+                          key={u.id || u.username}
+                          onClick={() => {
+                            setDirectFriendName(u.name);
+                            setDirectFriendUpi(u.upiId || `${u.username}@upi`);
+                            setShowInviteSuggestions(false);
+                          }}
+                          className="flex items-center justify-between p-1.5 rounded-lg hover:bg-zinc-100 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={u.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.name)}`}
+                              alt={u.name}
+                              className="w-6 h-6 rounded-full border border-zinc-200"
+                            />
+                            <div>
+                              <div className="text-xs font-bold text-zinc-900">{u.name}</div>
+                              <div className="text-[10px] text-zinc-500 font-mono">@{u.username}</div>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Select
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={directFriendUpi}
+                    onChange={(e) => setDirectFriendUpi(e.target.value)}
+                    placeholder="UPI ID (e.g. karthik@oksbi)"
+                    className="bharpai-input px-3 py-2 text-xs font-mono"
+                  />
+                  <button
+                    type="submit"
+                    className="py-2 px-3 rounded-xl text-xs font-bold text-white btn-bharpai-primary flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add to Group Now</span>
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -2000,10 +2250,10 @@ export default function DashboardView({ initialGroupId }) {
         </div>
       )}
 
-      {/* MODAL: CREATE NEW GROUP */}
+      {/* MODAL: CREATE NEW GROUP WITH USERNAME DIRECTORY BINARY SEARCH */}
       {isNewGroupOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#09090b]/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bharpai-card max-w-md w-full p-6 sm:p-7 relative bg-white border border-[#e4e4e7] shadow-2xl">
+          <div className="bharpai-card max-w-lg w-full p-6 sm:p-7 relative bg-white border border-[#e4e4e7] shadow-2xl rounded-3xl">
             <button
               onClick={() => setIsNewGroupOpen(false)}
               className="absolute top-5 right-5 text-[#71717a] hover:text-[#09090b] cursor-pointer"
@@ -2011,10 +2261,17 @@ export default function DashboardView({ initialGroupId }) {
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-xl font-bold font-display text-[#09090b] flex items-center gap-2 mb-4">
-              <Users className="w-5 h-5 text-emerald-600" />
-              Create New Split Group
-            </h3>
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-9 h-9 rounded-xl bg-[#09090b] text-white flex items-center justify-center font-bold text-sm">
+                <Users className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold font-display text-[#09090b]">Create New Split Group</h3>
+                <p className="text-xs text-[#71717a]">
+                  Search usernames to add friends with automatic UPI setup
+                </p>
+              </div>
+            </div>
 
             <form onSubmit={handleCreateGroup} className="space-y-4">
               <div>
@@ -2045,27 +2302,167 @@ export default function DashboardView({ initialGroupId }) {
                 </select>
               </div>
 
+              {/* USERNAME & NAME DIRECTORY SEARCH WITH BINARY SEARCH */}
               <div>
-                <label className="block text-xs font-medium text-[#09090b] mb-1">
-                  Add Friends / Members (comma separated)
-                </label>
-                <input
-                  type="text"
-                  value={newGroupMembersText}
-                  onChange={(e) => setNewGroupMembersText(e.target.value)}
-                  placeholder="Rohan Sharma, Priya Patel, Karthik"
-                  className="bharpai-input w-full px-3.5 py-2.5 text-sm"
-                />
-                <p className="text-[11px] text-[#71717a] mt-1">
-                  You ({user?.name || "You"}) will be added automatically as the creator.
-                </p>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-medium text-[#09090b]">
+                    Add Friends / Members by Username
+                  </label>
+                  <span className="text-[10px] font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-emerald-500" />
+                    <span>Binary Search</span>
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3 font-mono text-zinc-400 font-bold text-xs">@</span>
+                    <input
+                      type="text"
+                      value={memberSearchQuery}
+                      onFocus={() => setShowDirectoryDropdown(true)}
+                      onChange={(e) => {
+                        setMemberSearchQuery(e.target.value);
+                        setShowDirectoryDropdown(true);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (directorySuggestions.length > 0) {
+                            handleSelectDirectoryUser(directorySuggestions[0]);
+                          } else if (memberSearchQuery.trim()) {
+                            handleAddCustomMember(memberSearchQuery);
+                          }
+                        }
+                      }}
+                      placeholder="Type username (e.g. varunsharma, siddharth) or name..."
+                      className="bharpai-input w-full pl-8 pr-9 py-2.5 text-xs font-mono"
+                    />
+                    <Search className="w-4 h-4 text-zinc-400 absolute right-3 pointer-events-none" />
+                  </div>
+
+                  {/* AUTOCOMPLETE DROPDOWN */}
+                  {showDirectoryDropdown && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-[#e4e4e7] rounded-2xl shadow-2xl max-h-56 overflow-y-auto p-1.5 space-y-1 animate-fadeIn">
+                      <div className="px-2.5 py-1 text-[10px] font-mono uppercase text-zinc-400 font-bold flex items-center justify-between">
+                        <span>Directory Suggestions</span>
+                        <span>{directorySuggestions.length} found</span>
+                      </div>
+
+                      {directorySuggestions.length > 0 ? (
+                        directorySuggestions.map((u) => (
+                          <div
+                            key={u.id || u.username}
+                            onClick={() => handleSelectDirectoryUser(u)}
+                            className="flex items-center justify-between p-2 rounded-xl hover:bg-zinc-50 border border-transparent hover:border-zinc-200 cursor-pointer transition-all group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <img
+                                src={u.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.username || u.name)}`}
+                                alt={u.name}
+                                className="w-7 h-7 rounded-full border border-zinc-200 shrink-0"
+                              />
+                              <div className="truncate">
+                                <div className="text-xs font-bold text-zinc-900 flex items-center gap-1.5">
+                                  <span>{u.name}</span>
+                                  <span className="text-[11px] font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded font-normal">
+                                    @{u.username}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-zinc-400 font-mono truncate">
+                                  UPI: {u.upiId || `${u.username}@upi`}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="px-2.5 py-1 rounded-lg bg-zinc-900 group-hover:bg-emerald-600 text-white text-[11px] font-bold flex items-center gap-1 shrink-0 transition-colors"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Add</span>
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-3 text-center text-xs text-zinc-500">
+                          No exact directory match for &ldquo;{memberSearchQuery}&rdquo;.
+                        </div>
+                      )}
+
+                      {memberSearchQuery.trim() && (
+                        <div
+                          onClick={() => handleAddCustomMember(memberSearchQuery)}
+                          className="mt-1 p-2 rounded-xl bg-zinc-50 hover:bg-zinc-100 border border-dashed border-zinc-300 flex items-center justify-between cursor-pointer text-xs font-bold text-zinc-900"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Add &ldquo;{memberSearchQuery.trim()}&rdquo; as custom friend</span>
+                          </span>
+                          <span className="text-[10px] font-mono text-zinc-400">Press Enter</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* SELECTED MEMBERS CHIPS */}
+                <div className="mt-3 space-y-1.5">
+                  <div className="text-[11px] font-bold text-zinc-600 flex items-center justify-between">
+                    <span>Group Members ({1 + selectedNewMembers.length})</span>
+                    <span className="text-[10px] text-zinc-400 font-mono">Click ✕ to remove</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 p-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 min-h-[46px] items-center">
+                    {/* Creator Chip */}
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-zinc-300 text-xs font-bold text-zinc-900 shadow-2xs">
+                      <img
+                        src={user?.avatar || AVATAR_PRESETS[0]}
+                        alt={user?.name || "You"}
+                        className="w-4 h-4 rounded-full border border-zinc-200"
+                      />
+                      <span>{user?.name || "You"}</span>
+                      <span className="text-[10px] font-mono text-zinc-500">(@{user?.username || "you"})</span>
+                      <span className="text-[9px] font-mono uppercase bg-zinc-900 text-white px-1.5 py-0.2 rounded font-bold">
+                        Creator
+                      </span>
+                    </div>
+
+                    {/* Added Members Chips */}
+                    {selectedNewMembers.map((m, idx) => (
+                      <div
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-900 shadow-2xs animate-fadeIn"
+                      >
+                        <img
+                          src={m.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(m.username || m.name)}`}
+                          alt={m.name}
+                          className="w-4 h-4 rounded-full border border-emerald-300"
+                        />
+                        <span>{m.name}</span>
+                        {m.username && (
+                          <span className="text-[10px] font-mono text-emerald-700 font-normal">
+                            (@{m.username})
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveNewMember(idx)}
+                          className="text-emerald-700 hover:text-emerald-950 p-0.5 rounded-full hover:bg-emerald-100 cursor-pointer ml-0.5"
+                          title="Remove member"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 px-4 rounded-xl font-bold text-white btn-bharpai-primary flex items-center justify-center gap-2 mt-2 cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl font-bold text-white btn-bharpai-primary flex items-center justify-center gap-2 mt-2 cursor-pointer shadow-md"
               >
-                <span>Create Group</span>
+                <span>Create Group & Start Splitting</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>

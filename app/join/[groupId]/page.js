@@ -18,7 +18,8 @@ import {
   User,
   Eye,
   EyeOff,
-  Check
+  Check,
+  AtSign
 } from "lucide-react";
 
 export default function JoinGroupPage() {
@@ -35,6 +36,7 @@ export default function JoinGroupPage() {
 
   // Auth Card state (for non-authenticated users)
   const [authTab, setAuthTab] = useState("register"); // 'register' | 'login'
+  const [authUsername, setAuthUsername] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
@@ -115,13 +117,21 @@ export default function JoinGroupPage() {
     e.preventDefault();
     setAuthError("");
 
+    const cleanUsername = authUsername.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    if (!cleanUsername || cleanUsername.length < 3) {
+      setAuthError("Username must be at least 3 characters (lowercase letters and numbers only, no symbols or spaces).");
+      return;
+    }
+
     if (!authName.trim() || !authEmail.trim() || !authPassword) {
-      setAuthError("Please fill in your name, email, and password.");
+      setAuthError("Please fill in your username, name, email, and password.");
       return;
     }
 
     setAuthSubmitting(true);
     const res = await register({
+      username: cleanUsername,
       name: authName.trim(),
       email: authEmail.trim(),
       password: authPassword,
@@ -288,6 +298,35 @@ export default function JoinGroupPage() {
             {/* REGISTER FORM */}
             {authTab === "register" ? (
               <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-zinc-700">
+                      Unique Username
+                    </label>
+                    <span className="text-[10px] text-zinc-400 font-mono">No caps/symbols/spaces</span>
+                  </div>
+                  <div className="relative">
+                    <span className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs flex items-center justify-center">@</span>
+                    <input
+                      type="text"
+                      required
+                      value={authUsername}
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20);
+                        setAuthUsername(val);
+                      }}
+                      placeholder="e.g. karthikr"
+                      className="bharpai-input w-full pl-8 pr-3 py-2 rounded-xl text-xs font-mono placeholder:text-zinc-400"
+                    />
+                  </div>
+                  {authUsername && (
+                    <p className="text-[10px] mt-1 text-emerald-600 font-mono flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Handle: @{authUsername}</span>
+                    </p>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 mb-1">
                     Your Full Name

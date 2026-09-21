@@ -68,13 +68,13 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async ({ name, email, password, upiId, phone }) => {
+  const register = async ({ username, name, email, password, upiId, phone }) => {
     setIsLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, upiId, phone })
+        body: JSON.stringify({ username, name, email, password, upiId, phone })
       });
 
       const data = await res.json();
@@ -93,7 +93,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const updateProfile = async ({ name, upiId, avatar, phone }) => {
+  const updateProfile = async ({ name, username, upiId, avatar, phone }) => {
     setIsLoading(true);
     try {
       const savedToken = token || localStorage.getItem("splitwme_jwt");
@@ -103,7 +103,7 @@ export function AuthProvider({ children }) {
           "Content-Type": "application/json",
           ...(savedToken ? { Authorization: `Bearer ${savedToken}` } : {})
         },
-        body: JSON.stringify({ name, upiId, avatar, phone })
+        body: JSON.stringify({ name, username, upiId, avatar, phone })
       });
 
       const data = await res.json();

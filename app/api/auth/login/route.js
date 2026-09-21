@@ -1,30 +1,32 @@
 import { NextResponse } from "next/server";
-import { findUserByEmail } from "@/lib/users";
+import { findUserByEmailOrUsername } from "@/lib/users";
 import { signToken } from "@/lib/jwt";
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const { email, username, password } = body;
+    const identifier = email || username;
 
-    if (!email || !password) {
+    if (!identifier || !password) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: "Email/Username and password are required" },
         { status: 400 }
       );
     }
 
-    const user = findUserByEmail(email);
+    const user = findUserByEmailOrUsername(identifier);
     if (!user || user.password !== password) {
       return NextResponse.json(
-        { error: "Invalid email or password" },
+        { error: "Invalid email/username or password" },
         { status: 401 }
       );
     }
 
-    // Build JWT payload
+    // Build JWT payload with username
     const tokenPayload = {
       id: user.id,
+      username: user.username,
       name: user.name,
       email: user.email,
       upiId: user.upiId,
